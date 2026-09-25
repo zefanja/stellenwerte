@@ -1,17 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import postgres from 'postgres';
 import { pgOptions } from '../src/lib/server/db/connection.js';
 import { TEST_DATABASE_URL } from '../playwright.config';
 import { SCHUELER } from './testdaten';
+import { tippeCode } from './hilfen';
 
 test.describe.configure({ mode: 'serial' });
-
-/** Code nur per Antippen des Ziffernblocks eingeben, wie ein Kind am Handy */
-async function tippeCode(page: Page, code: string) {
-	const block = page.getByRole('group', { name: 'Ziffernblock' });
-	for (const z of code) await block.getByRole('button', { name: z, exact: true }).tap();
-	await block.getByRole('button', { name: 'Bestätigen' }).tap();
-}
 
 test('ohne Anmeldung landet man beim Ziffernblock, ohne Eingabefeld', async ({ page }) => {
 	await page.goto('/');
@@ -88,21 +82,4 @@ test('Codewechsel meldet bestehende Sessions ab', async ({ page }) => {
 	await expect(page).toHaveURL('/login');
 	await sql`update student set code_last_rotated = now() - interval '1 minute'`;
 	await sql.end();
-});
-
-// Muss der letzte Test sein: danach ist die IP 60 Sekunden gesperrt.
-test('nach 10 falschen Codes ist die Anmeldung gesperrt, auch mit richtigem Code', async ({
-	page
-}) => {
-	await page.goto('/login');
-	for (let i = 0; i < 9; i++) {
-		await tippeCode(page, '000000');
-		await expect(page.getByText('Code falsch. Probier es noch mal.')).toBeVisible();
-	}
-	await tippeCode(page, '000000');
-	await expect(page.getByText('Kurz warten. Dann noch mal.')).toBeVisible();
-	await expect(page.getByRole('button', { name: '1', exact: true })).toBeDisabled();
-
-	const res = await page.request.post('/api/login', { data: { code: SCHUELER.code } });
-	expect(res.status()).toBe(429);
 });

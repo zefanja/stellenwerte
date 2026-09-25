@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { zahlwort } from './zahlwort';
+import { zahlwort, zahlwortGetrennt } from './zahlwort';
 
 describe('zahlwort', () => {
 	it.each([
@@ -29,6 +29,11 @@ describe('zahlwort', () => {
 		[999999, 'neunhundertneunundneunzigtausendneunhundertneunundneunzig']
 	])('%i → %s', (n, wort) => {
 		expect(zahlwort(n)).toBe(wort);
+	});
+
+	it('trennt an den Wortbausteinen', () => {
+		expect(zahlwortGetrennt(168)).toBe('ein\u00ADhundert\u00ADacht\u00ADund\u00ADsechzig');
+		expect(zahlwortGetrennt(2043)).toBe('zwei\u00ADtausend\u00ADdrei\u00ADund\u00ADvierzig');
 	});
 
 	it('lehnt Zahlen außerhalb 0 … 999 999 ab', () => {

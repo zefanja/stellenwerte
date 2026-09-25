@@ -17,3 +17,23 @@ body {
 	/* kein Doppeltipp-Zoom, keine Tippverzögerung */
 	touch-action: manipulation;
 }
+
+/* Aufgabenseite: oben Aufgabe und Darstellung, unten alle Bedienelemente */
+.aufgabe {
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+.aufgabe .oben {
+	display: flex;
+	min-height: 0;
+	flex: 1 1 0;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.aufgabe .unten {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}

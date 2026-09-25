@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { einstellungen, ladeEinstellungen, setzeAnimationen } from '$lib/einstellungen.svelte';
 	let { data } = $props();
+
+	onMount(ladeEinstellungen);
 
 	async function abmelden() {
 		await fetch('/api/logout', { method: 'POST' });
@@ -17,19 +21,24 @@
 		<p class="text-5xl font-bold break-words" data-testid="begruessung">{data.label}</p>
 	</section>
 	<div class="flex flex-col gap-3">
+		<a
+			href={resolve('/ueben')}
+			class="flex min-h-24 items-center justify-center rounded-2xl bg-emerald-600 text-3xl font-semibold text-white shadow"
+		>
+			Los geht's
+		</a>
 		<button
 			type="button"
-			class="min-h-24 rounded-2xl bg-slate-300 text-2xl font-semibold text-slate-600"
-			disabled
+			class="flex min-h-12 items-center justify-center gap-2 rounded-xl text-slate-600"
+			aria-pressed={einstellungen.animationen}
+			onclick={() => setzeAnimationen(!einstellungen.animationen)}
 		>
-			Üben kommt bald
+			Bewegung: <strong>{einstellungen.animationen ? 'an' : 'aus'}</strong>
 		</button>
 		<button
 			type="button"
 			class="min-h-11 self-center px-4 text-slate-600 underline"
-			onclick={abmelden}
+			onclick={abmelden}>Nicht du? Abmelden</button
 		>
-			Nicht du? Abmelden
-		</button>
 	</div>
 </main>

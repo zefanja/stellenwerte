@@ -9,7 +9,8 @@ Web-App für tägliche 5-Minuten-Übungen zum Stellenwertverständnis (Klasse 5�
 | 1   | Gerüst, Datenmodell, Migrationen, Lehrer-Login, Gruppen/Schüler | fertig                                                                  |
 | 2   | Schüler-Login mit Ziffernblock, Cookie, „Bist du das?“    | fertig, Playwright-Test im Handy-Format; Prüfung auf echtem Handy offen |
 | 3   | Generatoren und Fehlertypen Wochen 1–3 mit Tests          | fertig, 8 Generatoren, je 200 Items pro Parametersatz geprüft           |
-| 4–8 | Oberfläche, FSRS, Dashboard, PDF, PWA                     | offen                                                                   |
+| 4   | Eingabekomponenten, SVG-Material, Animationen, Session-Flow | fertig, Playwright löst 10+5 Aufgaben nur mit Tipps in der unteren Hälfte; Prüfung auf echtem Handy offen |
+| 5–8 | FSRS, Dashboard, PDF, PWA                                 | offen                                                                   |
 
 ## Entwicklung
 
@@ -28,7 +29,7 @@ npm run dev               # Lehrer-Zugang unter /lehrer
 
 `DATABASE_URL` wählt einen Socket-Ordner über `?host=/pfad` (siehe `src/lib/server/db/connection.js`). Migrationen liegen in `drizzle/` und laufen beim Serverstart. Schemaänderungen: `schema.ts` ändern, dann `npm run db:generate`.
 
-Tests: `npx vitest run` (Generatoren, Rate Limit), `npx playwright test` (Login-Flow im Pixel-7-Format gegen die Datenbank `stellenwert_test`, vorher `createdb -h $PWD/.pgsock -U swt stellenwert_test`), `npm run check`, `npx eslint .`
+Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test` (Login und komplette Session im Pixel-7-Format gegen die Datenbank `stellenwert_test`, vorher `createdb -h $PWD/.pgsock -U swt stellenwert_test`), `npm run check`, `npx eslint .`
 
 ## Aufbau
 
@@ -36,6 +37,9 @@ Tests: `npx vitest run` (Generatoren, Rate Limit), `npx playwright test` (Login-
   - `katalog.ts`: 12 Skills mit Woche, Voraussetzungen, Eingabetyp und Zielzeit; Wochen 4–5 haben noch `generator: null`
   - `generatoren/<skill_id>.ts`: `generate(params, seed)`, `bewerte(item, antwort)` und `baue(...)` für feste Beispiele
   - `fehler.ts`: alle `error_tag`s mit Klartext fürs Dashboard
+- `src/lib/material/`: SVG-Material, Layout der Stellenwerttafel (`layout.ts`, getestet), animiertes Modell mit Bündeln, Entbündeln, Legen und „Material zu Zahl“ (`modell.svelte.ts`), Gesten
+- `src/lib/aufgaben/`: eine Komponente je Eingabetyp, jeweils mit Versuch, Hilfe (zweiter Versuch mit Material) und Lösungsanimation
+- `src/routes/ueben/`: Session-Ablauf; `src/routes/api/session/*`, `api/attempt`: signierte Aufträge, serverseitige Bewertung
 - `src/lib/server/auth/`: Codes (Argon2id-Hash plus HMAC-Kurzindex), signierte Cookies, Rate Limit
 - `src/routes/lehrer/`: Lehrer-Oberfläche
 
@@ -51,6 +55,12 @@ Tests: `npx vitest run` (Generatoren, Rate Limit), `npx playwright test` (Login-
 - **Zusätzliche Spalte `student.code_index`** für den HMAC-Kurzindex aus der Spezifikation.
 - **Schüler-Login zweistufig:** `POST /api/login` mit `{ code }` liefert nur das Label für „Bist du das?“; erst `{ code, bestaetigt: true }` setzt das Cookie.
 - **Ziffernblock bleibt gesperrt, bis die Seite interaktiv ist**, damit auf langsamen Handys keine Tipps verloren gehen.
+- **Einhändig:** Alles, was man im Material (obere Hälfte) antippen, ziehen oder lange drücken kann, geht auch über Knöpfe unten: „10 bündeln“ wählt die fehlenden Würfel sichtbar selbst aus, die Tauschfläche hat je Spalte „bündeln“ und „tauschen“, der Vorrat legt per Tipp.
+- **Server bewertet selbst.** Jeder Auftrag ist per HMAC an die Session gebunden; `/api/attempt` generiert das Item aus Skill, Parametern und Seed neu und bewertet die Antwort. Die Bewertung des Clients dient nur der sofortigen Rückmeldung.
+- **Zweiter Versuch = `hint_used`.** Nach einer falschen Antwort kommt dieselbe Aufgabe mit Material zum Tauschen; diese Antwort wird mit `hint_used = true` gespeichert. `session.item_count` und `correct_count` zählen nur erste Versuche.
+- **Verlängerung:** Nach 10 Aufgaben „Noch 5 Aufgaben“, höchstens dreimal (`MAX_VERLAENGERUNGEN`), in derselben Session.
+- **Bewegung an/aus** auf der Startseite, gespeichert auf dem Gerät; Standard folgt `prefers-reduced-motion`.
+- **Noch nicht in M4:** `StrahlRegler` und `Auswahlkarten` kommen mit den Generatoren der Woche 5, die Stellenwechsel-Animation (399 + 1) mit `stelle_veraendern` (Woche 4), jeweils in M8. Antworten ohne Netz werden bisher nur im Speicher wiederholt; die Ablage auf dem Gerät folgt mit dem Offline-Puffer (M8).
 - **Lehrer-Oberfläche nutzt SvelteKit-Form-Actions** statt `/api/teacher/*`. Die JSON-Endpunkte kommen dazu, wenn sie gebraucht werden (Exporte).
 - **Zusätzliche Fehlertypen** über die Beispieltabelle hinaus, z. B. `nullstelle_fehlt`, `verkettet` (300 und 5 → 3005), `gerundet`, `kein_entbuendeln`. Liste in `fehler.ts`.
 - **`tauschen_entbuendeln`:** Die Antwort ist der Materialzustand nach dem Tauschen. Richtig ist jeder wertgleiche Zustand, in dem jede Spalte für die Wegnahme reicht. Mehr zu tauschen als nötig gilt nicht als Fehler.

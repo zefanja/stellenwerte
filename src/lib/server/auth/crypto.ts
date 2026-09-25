@@ -11,6 +11,17 @@ function hmac(data: string): Buffer {
 	return createHmac('sha256', secret()).update(data).digest();
 }
 
+/** HMAC als Hex, z. B. zum Signieren von Aufgabenaufträgen */
+export function signatur(data: string): string {
+	return hmac(data).toString('hex');
+}
+
+export function signaturGueltig(data: string, sig: string): boolean {
+	const expected = hmac(data);
+	const given = Buffer.from(sig, 'hex');
+	return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
 /** Sechsstelliger Code aus kryptografisch sicherem Zufall. */
 export function generateCode(): string {
 	return randomInt(0, 1_000_000).toString().padStart(6, '0');
