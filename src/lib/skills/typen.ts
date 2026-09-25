@@ -1,0 +1,64 @@
+import type { ErrorTag } from './fehler';
+
+/** Spalten der Stellenwerttafel, von groß nach klein. Dezimalstellen folgen in Woche 6. */
+export type Stelle = 'T' | 'H' | 'Z' | 'E';
+
+/** Anzahl der Material-Teile je Spalte. Werte über 9 sind erlaubt (nicht normiert). */
+export type Material = Partial<Record<Stelle, number>>;
+
+export type Darstellung =
+	/** Material zum Zählen oder Ablesen */
+	| { typ: 'material'; material: Material; anordnung: 'geordnet' | 'ungeordnet' }
+	/** Zahl in Ziffern, die mit Material gelegt werden soll */
+	| { typ: 'zahl'; zahl: number }
+	/** Zahlwort, wird angezeigt und kann vorgelesen werden */
+	| { typ: 'zahlwort'; wort: string }
+	/** Stellenschreibweise wie „4 H 13 Z 2 E“, nicht normiert */
+	| { typ: 'stellen'; material: Material }
+	/** Material vor einer Wegnahme: „42 − 7, was musst du tauschen?“ */
+	| { typ: 'wegnahme'; zahl: number; abzug: number; material: Material }
+	/** „Wie viele Zehner stecken in 340?“ */
+	| { typ: 'buendel'; zahl: number; stelle: Stelle }
+	/** „34 Zehner sind welche Zahl?“ */
+	| { typ: 'buendel_umkehr'; anzahl: number; stelle: Stelle };
+
+export type Antwort = { typ: 'zahl'; wert: number } | { typ: 'material'; material: Material };
+
+export type EingabeTyp =
+	| 'ziffernblock'
+	| 'material_buendeln'
+	| 'material_tauschen'
+	| 'material_legen'
+	| 'ziffernblock_kette'
+	| 'strahl_regler'
+	| 'auswahlkarten';
+
+export interface Distraktor {
+	antwort: Antwort;
+	error_tag: ErrorTag;
+}
+
+export interface Item<P = unknown> {
+	skillId: string;
+	seed: number;
+	params: P;
+	/** Aufgabentext, höchstens acht Wörter */
+	prompt: string;
+	darstellung: Darstellung;
+	loesung: Antwort;
+	/** Erwartbare Fehlantworten, eindeutig und verschieden von der Lösung */
+	distraktoren: Distraktor[];
+	/** Alle Fehlertypen, die dieser Generator erkennen kann */
+	error_tags: ErrorTag[];
+}
+
+export interface Bewertung {
+	correct: boolean;
+	error_tag: ErrorTag | null;
+}
+
+export interface Generator<P> {
+	defaults: P;
+	generate(params: P, seed: number): Item<P>;
+	bewerte(item: Item<P>, antwort: Antwort): Bewertung;
+}
