@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ohneHalt, SATZ, type Schrittfolge } from './schritte.svelte';
 	import { untrack } from 'svelte';
 	import { einstellungen } from '$lib/einstellungen.svelte';
 	import { TafelModell } from '$lib/material/modell.svelte';
@@ -17,8 +18,10 @@
 		modus: Modus;
 		onantwort: (a: Antwort) => void;
 		onweiter: () => void;
+		/** nur im Beispiel („Schau zu“): Schritte einzeln bestätigen */
+		schritte?: Schrittfolge;
 	}
-	let { item, modus, onantwort, onweiter }: Props = $props();
+	let { item, modus, onantwort, onweiter, schritte }: Props = $props();
 	let fertig = $state(false);
 
 	// svelte-ignore state_referenced_locally
@@ -37,14 +40,19 @@
 	});
 
 	async function zeigeLoesung() {
+		const takt = schritte?.takt ?? ohneHalt;
 		modell.zuruecksetzen();
+		if (schritte) await takt(`${d.zahl} − ${d.abzug}: Reicht das Material zum Wegnehmen?`);
 		if (item.loesung.typ === 'material') {
 			const ziel = item.loesung.material;
 			for (const s of modell.spalten) {
-				while (modell.anzahl(s) > (ziel[s] ?? 0) && modell.kannEntbuendeln(s))
+				while (modell.anzahl(s) > (ziel[s] ?? 0) && modell.kannEntbuendeln(s)) {
+					await takt(SATZ.entbuendeln(s));
 					await modell.entbuendeln(s);
+				}
 			}
 		}
+		schritte?.fertig('Fertig! So geht es.');
 		fertig = true;
 	}
 </script>
@@ -66,7 +74,7 @@
 
 	<section class="unten">
 		{#if modus === 'loesung'}
-			<Weiter bereit={fertig} {onweiter} />
+			<Weiter bereit={fertig} {onweiter} {schritte} />
 		{:else}
 			<Tauschflaeche {modell} />
 			<div class="grid grid-cols-2 gap-2">

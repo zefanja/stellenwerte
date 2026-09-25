@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ohneHalt, SATZ, type Schrittfolge } from './schritte.svelte';
 	import { untrack } from 'svelte';
 	import Ziffernblock from '$lib/components/Ziffernblock.svelte';
 	import { einstellungen } from '$lib/einstellungen.svelte';
@@ -16,8 +17,10 @@
 		modus: Modus;
 		onantwort: (a: Antwort) => void;
 		onweiter: () => void;
+		/** nur im Beispiel („Schau zu“): Schritte einzeln bestätigen */
+		schritte?: Schrittfolge;
 	}
-	let { item, modus, onantwort, onweiter }: Props = $props();
+	let { item, modus, onantwort, onweiter, schritte }: Props = $props();
 
 	let eingabe = $state('');
 	let fertig = $state(false);
@@ -33,8 +36,11 @@
 	});
 
 	async function zeigeLoesung() {
+		const takt = schritte?.takt ?? ohneHalt;
 		modell.zuruecksetzen();
-		await modell.allesBuendeln();
+		if (schritte) await takt(SATZ.start);
+		await modell.allesBuendeln(takt);
+		schritte?.fertig('Fertig! So geht es.');
 		fertig = true;
 	}
 
@@ -57,7 +63,7 @@
 
 	<section class="unten">
 		{#if modus === 'loesung'}
-			<Weiter bereit={fertig} {onweiter} />
+			<Weiter bereit={fertig} {onweiter} {schritte} />
 		{:else}
 			<div class="flex gap-2">
 				<button

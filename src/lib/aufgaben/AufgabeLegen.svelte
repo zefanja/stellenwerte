@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ohneHalt, SATZ, type Schrittfolge } from './schritte.svelte';
 	import { untrack } from 'svelte';
 	import { einstellungen } from '$lib/einstellungen.svelte';
 	import { warte } from '$lib/material/animation';
@@ -6,7 +7,7 @@
 	import Tafel from '$lib/material/Tafel.svelte';
 	import Vorrat from '$lib/material/Vorrat.svelte';
 	import ZahlTafel from '$lib/material/ZahlTafel.svelte';
-	import { normiert } from '$lib/skills/material';
+	import { normiert, STELLENNAME } from '$lib/skills/material';
 	import type { Antwort, Item, Stelle } from '$lib/skills/typen';
 	import AufgabeKopf from './AufgabeKopf.svelte';
 	import { spaltenFuer, type Modus } from './hilfe';
@@ -18,8 +19,10 @@
 		modus: Modus;
 		onantwort: (a: Antwort) => void;
 		onweiter: () => void;
+		/** nur im Beispiel („Schau zu“): Schritte einzeln bestätigen */
+		schritte?: Schrittfolge;
 	}
-	let { item, modus, onantwort, onweiter }: Props = $props();
+	let { item, modus, onantwort, onweiter, schritte }: Props = $props();
 	let fertig = $state(false);
 	let tafel: Tafel | undefined = $state();
 	const gelegt: Stelle[] = [];
@@ -39,14 +42,20 @@
 	});
 
 	async function zeigeLoesung() {
+		const takt = schritte?.takt ?? ohneHalt;
 		modell.zuruecksetzen();
 		const ziel = normiert(zahl);
+		if (schritte) await takt(SATZ.start);
 		for (const s of modell.spalten) {
-			for (let i = 0; i < (ziel[s] ?? 0); i++) {
+			const n = ziel[s] ?? 0;
+			if (n > 0)
+				await takt(`${n} ${n === 1 ? STELLENNAME[s].einzahl : STELLENNAME[s].mehrzahl} legen.`);
+			for (let i = 0; i < n; i++) {
 				await modell.hinzufuegen(s);
 				if (einstellungen.animationen) await warte(60);
 			}
 		}
+		schritte?.fertig('Fertig! So geht es.');
 		fertig = true;
 	}
 
@@ -77,7 +86,7 @@
 
 	<section class="unten">
 		{#if modus === 'loesung'}
-			<Weiter bereit={fertig} {onweiter} />
+			<Weiter bereit={fertig} {onweiter} {schritte} />
 		{:else}
 			<Vorrat spalten={modell.spalten} onnehmen={nehmen} />
 			<div class="grid grid-cols-2 gap-2">

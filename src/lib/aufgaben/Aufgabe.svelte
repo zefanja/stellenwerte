@@ -9,10 +9,16 @@
 	import AufgabeTauschen from './AufgabeTauschen.svelte';
 	import AufgabeZiffern from './AufgabeZiffern.svelte';
 	import type { Modus } from './hilfe';
+	import type { Schrittfolge } from './schritte.svelte';
 
 	/** Wählt die Aufgabenkomponente nach dem Eingabetyp des Skills. */
-	let props: { item: Item; modus: Modus; onantwort: (a: Antwort) => void; onweiter: () => void } =
-		$props();
+	let props: {
+		item: Item;
+		modus: Modus;
+		onantwort: (a: Antwort) => void;
+		onweiter: () => void;
+		schritte?: Schrittfolge;
+	} = $props();
 	const typ = $derived(SKILLS.get(props.item.skillId)?.eingabe_typ);
 </script>
 

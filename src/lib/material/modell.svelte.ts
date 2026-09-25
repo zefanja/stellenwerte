@@ -1,6 +1,7 @@
 /* eslint-disable svelte/prefer-svelte-reactivity -- Set/Map hier sind interne Hilfsstrukturen, nichts davon wird gerendert */
 import { STELLEN, wert } from '$lib/skills/material';
 import type { Material, Stelle } from '$lib/skills/typen';
+import { SATZ } from '$lib/aufgaben/schritte.svelte';
 import { BEWEGUNG_MS, LEUCHTEN_MS, gezeichnet, warte } from './animation';
 import {
 	layoutStreu,
@@ -280,18 +281,27 @@ export class TafelModell {
 		});
 	}
 
-	/** Alle Spalten mit zehn oder mehr Teilen bündeln, von klein nach groß */
-	async normieren() {
+	/**
+	 * Alle Spalten mit zehn oder mehr Teilen bündeln, von klein nach groß. `vorher` läuft vor jedem
+	 * Schritt (im Beispiel wartet es auf das Kind).
+	 */
+	async normieren(vorher: (satz: string) => Promise<void> = async () => {}) {
 		for (const s of [...this.spalten].reverse()) {
-			while (this.kannBuendeln(s)) await this.buendeln(s);
+			while (this.kannBuendeln(s)) {
+				await vorher(SATZ.buendeln(s));
+				await this.buendeln(s);
+			}
 		}
 	}
 
 	/** Alle Teile oberhalb von `ziel` bis dorthin entbündeln (für „Wie viele Zehner stecken in …?“) */
-	async entbuendelnBis(ziel: Stelle) {
+	async entbuendelnBis(ziel: Stelle, vorher: (satz: string) => Promise<void> = async () => {}) {
 		for (const s of this.spalten) {
 			if (s === ziel) break;
-			while (this.anzahl(s) > 0) await this.entbuendeln(s);
+			while (this.anzahl(s) > 0) {
+				await vorher(SATZ.entbuendeln(s));
+				await this.entbuendeln(s);
+			}
 		}
 	}
 }
@@ -455,7 +465,10 @@ export class StreuModell {
 	}
 
 	/** Lösung zeigen: so lange bündeln, wie es geht */
-	async allesBuendeln() {
-		while (this.loseWuerfel >= 10) await this.zehnBuendeln();
+	async allesBuendeln(vorher: (satz: string) => Promise<void> = async () => {}) {
+		while (this.loseWuerfel >= 10) {
+			await vorher('Zehn Würfel werden zu einer Zehnerstange.');
+			await this.zehnBuendeln();
+		}
 	}
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Schrittfolge } from './schritte.svelte';
 	import { untrack } from 'svelte';
 	import Strahl from '$lib/components/Strahl.svelte';
 	import Ziffernblock from '$lib/components/Ziffernblock.svelte';
@@ -20,8 +21,10 @@
 		modus: Modus;
 		onantwort: (a: Antwort) => void;
 		onweiter: () => void;
+		/** nur im Beispiel („Schau zu“): Schritte einzeln bestätigen */
+		schritte?: Schrittfolge;
 	}
-	let { item, modus, onantwort, onweiter }: Props = $props();
+	let { item, modus, onantwort, onweiter, schritte }: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	const d =
@@ -34,8 +37,22 @@
 	const komma = d.raster < 1;
 
 	$effect(() => {
-		if (modus === 'loesung') untrack(() => (fertig = true));
+		if (modus === 'loesung') untrack(zeigeLoesung);
 	});
+
+	/** Lösung erst aufdecken, im Beispiel nach einem Tipp */
+	let aufgedeckt = $state(false);
+	async function zeigeLoesung() {
+		if (schritte)
+			await schritte.takt(
+				d.modus === 'verorten'
+					? 'Wo liegt die Zahl? Schau auf den Strahl.'
+					: 'Welche Zahl zeigt der Pfeil?'
+			);
+		aufgedeckt = true;
+		schritte?.fertig('Fertig! So geht es.');
+		fertig = true;
+	}
 
 	const setze = (w: number) => (marke = Math.min(d.bis, Math.max(d.von, aufRaster(w, d.raster))));
 	const wippe = (richtung: number) => setze((marke ?? (d.von + d.bis) / 2) + richtung * d.raster);
@@ -55,11 +72,11 @@
 					bis={d.bis}
 					pfeil={d.zahl}
 					teilung={modus !== 'versuch'}
-					loesung={modus === 'loesung' ? d.zahl : null}
+					loesung={aufgedeckt ? d.zahl : null}
 				/>
 			</div>
 		{/if}
-		{#if modus === 'loesung'}
+		{#if aufgedeckt}
 			<p class="mt-auto text-center text-4xl font-bold text-emerald-700" data-testid="loesung">
 				{zahlText(d.zahl)}
 			</p>
@@ -74,7 +91,7 @@
 					bis={d.bis}
 					{marke}
 					teilung={modus !== 'versuch'}
-					loesung={modus === 'loesung' ? d.zahl : null}
+					loesung={aufgedeckt ? d.zahl : null}
 					onsetze={modus === 'loesung' ? undefined : setze}
 				/>
 			</div>
@@ -124,7 +141,7 @@
 			{/if}
 		{/if}
 		{#if modus === 'loesung'}
-			<Weiter bereit={fertig} {onweiter} />
+			<Weiter bereit={fertig} {onweiter} {schritte} />
 		{:else if d.modus === 'ablesen'}
 			<AntwortAnzeige wert={eingabe} />
 			<Ziffernblock

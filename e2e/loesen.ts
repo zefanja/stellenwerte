@@ -14,14 +14,30 @@ export async function loese(page: Page, auftrag: Auftrag) {
 	};
 	const skill = SKILLS.get(auftrag.skill_id)!;
 	const item = skill.generator!.generate(auftrag.params, auftrag.seed);
+	// vor Einführungsblöcken kommt eine Ankündigung
+	await expect(page.getByTestId('prompt').or(page.getByTestId('ankuendigung'))).toBeVisible();
+	if (await page.getByTestId('ankuendigung').isVisible())
+		await tippeUnten(page, page.getByRole('button', { name: 'Los' }));
 	await expect(page.getByTestId('prompt')).toHaveText(item.prompt);
 	const unten = (name: string, exact = true) =>
 		tippeUnten(page, page.getByRole('button', { name, exact }));
 
 	if (auftrag.block === 'beispiel') {
-		// „Schau zu“: die Lösung läuft als Animation, danach nur Weiter
+		// „Schau zu“: jeder Schritt wartet auf einen Tipp, erst am Ende kommt Weiter
 		await expect(page.getByTestId('schau-zu')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Weiter' })).toBeEnabled({ timeout: 15_000 });
+		const naechster = page.getByRole('button', { name: 'Nächster Schritt' });
+		const weiter = page.getByRole('button', { name: 'Weiter' });
+		const bereit = naechster.and(page.locator('button:enabled'));
+		let schritte = 0;
+		for (;;) {
+			await expect(bereit.or(weiter)).toBeVisible({ timeout: 15_000 });
+			if (await weiter.isVisible()) break;
+			await expect(page.getByTestId('schritt-text')).not.toBeEmpty();
+			await unten('Nächster Schritt');
+			schritte++;
+		}
+		expect(schritte).toBeGreaterThanOrEqual(1);
+		await expect(weiter).toBeEnabled({ timeout: 15_000 });
 		await unten('Weiter');
 		return;
 	}

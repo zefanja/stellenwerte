@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ohneHalt, SATZ, type Schrittfolge } from './schritte.svelte';
 	import { untrack } from 'svelte';
 	import Ziffernblock from '$lib/components/Ziffernblock.svelte';
 	import { einstellungen } from '$lib/einstellungen.svelte';
@@ -22,8 +23,10 @@
 		modus: Modus;
 		onantwort: (a: Antwort) => void;
 		onweiter: () => void;
+		/** nur im Beispiel („Schau zu“): Schritte einzeln bestätigen */
+		schritte?: Schrittfolge;
 	}
-	let { item, modus, onantwort, onweiter }: Props = $props();
+	let { item, modus, onantwort, onweiter, schritte }: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	const d =
@@ -53,14 +56,18 @@
 	});
 
 	async function zeigeLoesung() {
+		const takt = schritte?.takt ?? ohneHalt;
 		modell?.zuruecksetzen();
 		werte = Array(d.laenge).fill('');
+		if (schritte) await takt(SATZ.start);
 		for (let i = 0; i < d.laenge; i++) {
+			await takt(`${zahlText(i === 0 ? d.start : soll[i - 1])} ${d.op} ${zahlText(d.schritt)}`);
 			if (modell) await stellenwechsel(modell, d.op, schrittStelle(d.schritt));
 			werte[i] = String(soll[i]);
 			if (einstellungen.animationen) await warte(250);
 		}
 		aktiv = -1;
+		schritte?.fertig('Fertig! So geht es.');
 		fertig = true;
 	}
 
@@ -104,7 +111,7 @@
 
 	<section class="unten">
 		{#if modus === 'loesung'}
-			<Weiter bereit={fertig} {onweiter} />
+			<Weiter bereit={fertig} {onweiter} {schritte} />
 		{:else}
 			{#if modus === 'hilfe' && modell}
 				<button

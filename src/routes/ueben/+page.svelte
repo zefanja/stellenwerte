@@ -4,6 +4,8 @@
 	import { resolve } from '$app/paths';
 	import Aufgabe from '$lib/aufgaben/Aufgabe.svelte';
 	import type { Modus } from '$lib/aufgaben/hilfe';
+	import { Schrittfolge } from '$lib/aufgaben/schritte.svelte';
+	import Vorlesen from '$lib/aufgaben/Vorlesen.svelte';
 	import { einstellungen, ladeEinstellungen } from '$lib/einstellungen.svelte';
 	import { postausgang } from '$lib/postausgang';
 	import { ladeSitzung, loescheSitzung, speichereSitzung } from '$lib/sitzung';
@@ -11,7 +13,8 @@
 	import type { Antwort, Item } from '$lib/skills/typen';
 	import { MAX_VERLAENGERUNGEN, type Auftrag, type SessionAntwort } from '$lib/training';
 
-	type Phase = 'laden' | 'aufgabe' | 'richtig' | 'ende' | 'leer' | 'fehler' | 'offline';
+	type Phase =
+		'laden' | 'ankuendigung' | 'aufgabe' | 'richtig' | 'ende' | 'leer' | 'fehler' | 'offline';
 
 	let sessionId = '';
 	let auftraege = $state<Auftrag[]>([]);
@@ -23,6 +26,10 @@
 	/** true richtig, false nicht gelöst, null nur angeschaut (Beispiel) */
 	let ergebnisse = $state<(boolean | null)[]>([]);
 	let startZeit = 0;
+	/** Im Beispiel: jeder Schritt der Lösung wartet auf „Nächster Schritt“ */
+	let schritte = $state<Schrittfolge | undefined>();
+	/** Ankündigung vor einem Einführungsblock, damit „Schau zu“ nicht überraschend kommt */
+	let ankuendigung = $state<{ titel: string; text: string; neu: boolean } | null>(null);
 
 	const item: Item | null = $derived.by(() => {
 		const a = auftraege[index];
@@ -71,12 +78,36 @@
 		}
 	});
 
-	/** Beispiele laufen als Lösungsanimation („Schau zu“), begleitete Aufgaben beginnen mit Material. */
+	/**
+	 * Beispiele laufen als Lösungsanimation („Schau zu“) Schritt für Schritt, begleitete Aufgaben
+	 * beginnen mit Material. Vor den Beispielen und vor den eigenen Aufgaben kommt eine Ankündigung.
+	 */
 	function starteAufgabe() {
-		const block = auftraege[index].block;
-		phase = 'aufgabe';
+		const a = auftraege[index];
+		const vorher = auftraege[index - 1];
+		const titel = SKILLS.get(a.skill_id)?.titel ?? '';
+		if (a.block === 'beispiel' && vorher?.block !== 'beispiel') {
+			ankuendigung = {
+				titel,
+				text: 'Schau zuerst zu, wie es geht. Tippe immer auf „Nächster Schritt“.',
+				neu: true
+			};
+		} else if (a.block === 'gefuehrt' && vorher?.block === 'beispiel') {
+			ankuendigung = {
+				titel: 'Jetzt bist du dran!',
+				text: 'Die nächsten Aufgaben machst du selbst. Das Material hilft dir.',
+				neu: false
+			};
+		} else ankuendigung = null;
+		phase = ankuendigung ? 'ankuendigung' : 'aufgabe';
 		versuch = 1;
-		modus = block === 'beispiel' ? 'loesung' : block === 'gefuehrt' ? 'hilfe' : 'versuch';
+		modus = a.block === 'beispiel' ? 'loesung' : a.block === 'gefuehrt' ? 'hilfe' : 'versuch';
+		schritte = a.block === 'beispiel' ? new Schrittfolge() : undefined;
+		startZeit = performance.now();
+	}
+
+	function losGehts() {
+		phase = 'aufgabe';
 		startZeit = performance.now();
 	}
 
@@ -179,7 +210,27 @@
 	</header>
 
 	<div class="relative min-h-0 flex-1">
-		{#if phase === 'laden'}
+		{#if phase === 'ankuendigung' && ankuendigung}
+			<div class="flex h-full flex-col" data-testid="ankuendigung">
+				<section class="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+					{#if ankuendigung.neu}
+						<span class="rounded-full bg-sky-100 px-4 py-1 text-lg font-semibold text-sky-800"
+							>Neu</span
+						>
+					{/if}
+					<h1 class="text-3xl font-bold">{ankuendigung.titel}</h1>
+					<div class="flex items-center gap-3">
+						<Vorlesen text="{ankuendigung.titel}. {ankuendigung.text}" />
+						<p class="text-xl text-slate-700">{ankuendigung.text}</p>
+					</div>
+				</section>
+				<button
+					type="button"
+					class="min-h-20 rounded-2xl bg-emerald-600 text-2xl font-semibold text-white shadow"
+					onclick={losGehts}>Los</button
+				>
+			</div>
+		{:else if phase === 'laden'}
 			<p class="mt-24 text-center text-2xl text-slate-500">…</p>
 		{:else if phase === 'fehler'}
 			<div class="mt-24 flex flex-col items-center gap-6 text-center">
@@ -263,7 +314,7 @@
 						Schau zu
 					</p>
 				{/if}
-				<Aufgabe {item} {modus} onantwort={beantworte} onweiter={nachAufgabe} />
+				<Aufgabe {item} {modus} {schritte} onantwort={beantworte} onweiter={nachAufgabe} />
 			{/key}
 			{#if phase === 'richtig'}
 				<!-- kurzes visuelles Signal ohne Ton -->

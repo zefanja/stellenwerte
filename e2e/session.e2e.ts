@@ -22,7 +22,15 @@ test('erste Session: Einführung einhändig lösbar, Verlängerung, danach FSRS-
 		...Array(5).fill('pruefung')
 	]);
 	expect(new Set(erste.auftraege.map((a) => a.skill_id))).toEqual(new Set(['buendeln_100']));
-	for (const a of erste.auftraege) await loese(page, a);
+	// Die Einführung wird angekündigt, bevor „Schau zu“ beginnt
+	await expect(page.getByTestId('ankuendigung')).toContainText('Neu');
+	await expect(page.getByTestId('ankuendigung')).toContainText('Bündeln bis 100');
+	for (const [i, a] of erste.auftraege.entries()) {
+		// nach den Beispielen: „Jetzt bist du dran!“
+		if (i === 2)
+			await expect(page.getByTestId('ankuendigung')).toContainText('Jetzt bist du dran!');
+		await loese(page, a);
+	}
 
 	await expect(page.getByText('Geschafft!')).toBeVisible();
 	const mehr = await sessionAntwort(page, () =>

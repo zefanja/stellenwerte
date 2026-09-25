@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Schrittfolge } from './schritte.svelte';
 	import { untrack } from 'svelte';
 	import Auswahlkarten from '$lib/components/Auswahlkarten.svelte';
 	import StellenVergleich from '$lib/components/StellenVergleich.svelte';
@@ -17,8 +18,10 @@
 		modus: Modus;
 		onantwort: (a: Antwort) => void;
 		onweiter: () => void;
+		/** nur im Beispiel („Schau zu“): Schritte einzeln bestätigen */
+		schritte?: Schrittfolge;
 	}
-	let { item, modus, onantwort, onweiter }: Props = $props();
+	let { item, modus, onantwort, onweiter, schritte }: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	const d =
@@ -30,10 +33,22 @@
 	let gewaehlt = $state<0 | 1 | null>(null);
 	let fertig = $state(false);
 	const alleStellen = stellenVon(d.zahlen[0], d.zahlen[1]);
+	/** Lösung erst aufdecken, im Beispiel in zwei Schritten */
+	let aufgedeckt = $state(false);
+	async function zeigeLoesung() {
+		if (schritte) {
+			await schritte.takt('Schreib die Zahlen nach Stellen untereinander.');
+			await schritte.takt('Vergleiche von links: Wo sind die Ziffern verschieden?');
+		}
+		aufgedeckt = true;
+		schritte?.fertig('Fertig! So geht es.');
+		fertig = true;
+	}
+
 	const farbe = (s: StellenName) => (s in FARBE ? FARBE[s as Stelle].text : '#475569');
 
 	$effect(() => {
-		if (modus === 'loesung') untrack(() => (fertig = true));
+		if (modus === 'loesung') untrack(zeigeLoesung);
 	});
 </script>
 
@@ -47,12 +62,12 @@
 				<StellenVergleich
 					zahlen={d.zahlen}
 					stellen={alleStellen}
-					markiert={modus === 'loesung' ? loesung?.stelle : null}
-					groessere={modus === 'loesung' ? loesung?.groessere : gewaehlt}
+					markiert={aufgedeckt ? loesung?.stelle : null}
+					groessere={aufgedeckt ? loesung?.groessere : gewaehlt}
 				/>
 			</div>
 		{/if}
-		{#if modus === 'loesung' && loesung}
+		{#if aufgedeckt && loesung}
 			<p class="mt-auto text-center text-2xl font-semibold text-emerald-700" data-testid="loesung">
 				{zahlText(d.zahlen[loesung.groessere])} ist größer. Es entscheiden die {STELLEN_NAME[
 					loesung.stelle
@@ -63,7 +78,7 @@
 
 	<section class="unten">
 		{#if modus === 'loesung'}
-			<Weiter bereit={fertig} {onweiter} />
+			<Weiter bereit={fertig} {onweiter} {schritte} />
 		{:else if gewaehlt === null}
 			<Auswahlkarten
 				optionen={d.zahlen.map((z, i) => ({ wert: i as 0 | 1, text: zahlText(z) }))}
