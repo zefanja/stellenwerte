@@ -32,6 +32,6 @@ export const actions: Actions = {
 			.insert(studentGroup)
 			.values({ teacherId: t.id, name })
 			.returning({ id: studentGroup.id });
-		redirect(303, `/lehrer/gruppen/${group.id}`);
+		redirect(303, `/lehrer/gruppen/${group.id}/verwaltung`);
 	}
 };

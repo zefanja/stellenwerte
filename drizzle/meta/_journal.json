@@ -15,6 +15,13 @@
       "when": 1790354783520,
       "tag": "0001_attempt_block",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790355294539,
+      "tag": "0002_card_again_in_folge",
+      "breakpoints": true
     }
   ]
 }

@@ -133,12 +133,18 @@ export async function schliesseAb(sessionId: string) {
 				.for('update');
 			if (!k) continue;
 			const pruefung = schluessel.startsWith('pruefung:');
+			if (pruefung ? k.state !== 0 : k.state === 0) continue;
+			const againInFolge = bewertung === Rating.Again ? k.againInFolge + 1 : 0;
 			// Prüfrunde: erst ab Hard wird aus der Einführung eine FSRS-Karte
-			if (pruefung && (k.state !== 0 || bewertung === Rating.Again)) continue;
-			if (!pruefung && k.state === 0) continue;
-			const zeitpunkt = vs.at(-1)!.createdAt;
-			const neu = wiederhole({ ...k, lastReview: k.lastReview }, bewertung, zeitpunkt);
-			await tx.update(card).set(neu).where(eq(card.id, k.id));
+			if (pruefung && bewertung === Rating.Again) {
+				await tx.update(card).set({ againInFolge }).where(eq(card.id, k.id));
+				continue;
+			}
+			const neu = wiederhole(k, bewertung, vs.at(-1)!.createdAt);
+			await tx
+				.update(card)
+				.set({ ...neu, againInFolge })
+				.where(eq(card.id, k.id));
 		}
 
 		const erste = versuche.filter((v) => !v.hintUsed);

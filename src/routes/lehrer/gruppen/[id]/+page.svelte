@@ -1,85 +1,166 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	let { data, form } = $props();
+	import { datumKurz } from '$lib/components/Datum';
+	import StatusZelle from '$lib/components/StatusZelle.svelte';
+	import { STATUS_TEXT, type ZellStatus } from '$lib/dashboard/regeln';
+	let { data } = $props();
 
-	const formatCode = (c: string) => `${c.slice(0, 3)} ${c.slice(3)}`;
+	const zahl = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
+	const titel = (z: {
+		status: ZellStatus;
+		stability: number | null;
+		due: Date | null;
+		againInFolge: number;
+	}) =>
+		[
+			STATUS_TEXT[z.status],
+			z.stability !== null ? `Stabilität ${zahl(z.stability)} Tage` : null,
+			z.due && z.status !== 'grau' ? `fällig ${datumKurz(z.due)}` : null,
+			z.againInFolge > 0 ? `${z.againInFolge}× Again in Folge` : null
+		]
+			.filter(Boolean)
+			.join(' · ');
+	const hier = $derived(resolve('/lehrer/gruppen/[id]', { id: data.gruppe.id }));
 </script>
 
-<svelte:head><title>{data.group.name}</title></svelte:head>
+<svelte:head><title>{data.gruppe.name} – Übersicht</title></svelte:head>
 
-<main class="mx-auto max-w-5xl px-4 py-8">
-	<a href={resolve('/lehrer/gruppen')} class="text-sm text-slate-500 hover:text-slate-900"
-		>← Alle Gruppen</a
-	>
-	<h1 class="mt-2 mb-6 text-2xl font-semibold">{data.group.name}</h1>
+<h2 class="mb-3 text-lg text-slate-600">Wer braucht diese Woche Aufmerksamkeit?</h2>
 
-	{#if form?.message}<p class="mb-4 text-red-700" role="alert">{form.message}</p>{/if}
+<section class="mb-5 grid max-w-3xl grid-cols-3 gap-3" aria-label="Kennzahlen">
+	<div class="rounded border border-slate-200 bg-white p-3">
+		<div class="text-2xl font-semibold" data-testid="aktiv7">
+			{data.kennzahlen.aktiv7} von {data.kennzahlen.schueler}
+		</div>
+		<div class="text-sm text-slate-600">aktiv in den letzten 7 Tagen</div>
+	</div>
+	<div class="rounded border border-slate-200 bg-white p-3">
+		<div class="text-2xl font-semibold" data-testid="median">
+			{zahl(data.kennzahlen.medianSessions)}
+		</div>
+		<div class="text-sm text-slate-600">Sessions pro Kind (Median, 7 Tage)</div>
+	</div>
+	<div class="rounded border border-slate-200 bg-white p-3">
+		<div
+			class="text-2xl font-semibold {data.kennzahlen.rot > 0 ? 'text-red-700' : ''}"
+			data-testid="rot"
+		>
+			{data.kennzahlen.rot}
+		</div>
+		<div class="text-sm text-slate-600">rote Felder</div>
+	</div>
+</section>
 
-	{#if form?.newCodes}
-		<section class="mb-8 rounded border-2 border-amber-400 bg-amber-50 p-4">
-			<h2 class="font-semibold">Neue Codes – nur jetzt sichtbar</h2>
-			<p class="mb-3 text-sm text-slate-700">
-				Bitte jetzt notieren oder drucken. Gespeichert wird nur ein Hash; die Codes lassen sich
-				später nicht mehr anzeigen, nur neu erzeugen.
-			</p>
-			<table class="text-left">
-				<tbody>
-					{#each form.newCodes as c (c.code)}
-						<tr
-							><td class="pr-8">{c.label}</td><td class="font-mono text-xl tracking-wider"
-								>{formatCode(c.code)}</td
-							></tr
+{#if data.zeilen.length === 0}
+	<p class="text-slate-600">
+		Noch keine Schüler. <a
+			class="underline"
+			href={resolve('/lehrer/gruppen/[id]/verwaltung', { id: data.gruppe.id })}>Schüler anlegen</a
+		>
+	</p>
+{:else}
+	<div class="mb-2 flex flex-wrap items-center gap-4 text-sm">
+		<span class="text-slate-600">Sortieren:</span>
+		<a href={hier} class={data.sortierung === 'name' ? 'font-semibold' : 'text-slate-600 underline'}
+			>nach Name</a
+		>
+		<a
+			href="{hier}?sort=rot"
+			class={data.sortierung === 'rot' ? 'font-semibold' : 'text-slate-600 underline'}
+			>meiste rote Felder zuerst</a
+		>
+		<span class="ml-auto flex gap-3">
+			<a
+				class="btn-secondary py-1 text-sm"
+				href={resolve('/api/teacher/gruppen/[id]/[datei]', {
+					id: data.gruppe.id,
+					datei: 'stand.csv'
+				})}
+				download>CSV: Stand</a
+			>
+			<a
+				class="btn-secondary py-1 text-sm"
+				href={resolve('/api/teacher/gruppen/[id]/[datei]', {
+					id: data.gruppe.id,
+					datei: 'fehler.csv'
+				})}
+				download>CSV: Fehlertypen</a
+			>
+		</span>
+	</div>
+
+	<div class="overflow-x-auto rounded border border-slate-200 bg-white">
+		<table class="w-full text-sm" data-testid="matrix">
+			<thead>
+				<tr class="border-b border-slate-200 align-bottom">
+					<th class="sticky left-0 bg-white px-3 py-2 text-left">Schüler</th>
+					{#each data.skills as s (s.id)}
+						<th
+							class="w-20 px-1 py-2 text-center text-xs font-medium {s.woche >
+							data.gruppe.activeTrack
+								? 'text-slate-400'
+								: ''}"
+							title="Woche {s.woche}"
 						>
+							{s.titel}
+						</th>
 					{/each}
-				</tbody>
-			</table>
+					<th class="px-2 py-2 text-right text-xs font-medium">Sessions 7 T.</th>
+					<th class="px-3 py-2 text-right text-xs font-medium">zuletzt</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each data.zeilen as z (z.id)}
+					<tr
+						class="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+						data-schueler={z.label}
+					>
+						<td class="sticky left-0 bg-white px-3 py-1.5">
+							<a
+								class="font-medium underline-offset-2 hover:underline"
+								href={resolve('/lehrer/schueler/[id]', { id: z.id })}>{z.label}</a
+							>
+						</td>
+						{#each data.skills as s (s.id)}
+							<td class="px-1 py-1.5 text-center" data-skill={s.id}>
+								<StatusZelle
+									status={z.zellen[s.id].status}
+									titel="{z.label}, {s.titel}: {titel(z.zellen[s.id])}"
+								/>
+							</td>
+						{/each}
+						<td
+							class="px-2 py-1.5 text-right tabular-nums {z.sessions7 === 0 ? 'text-red-700' : ''}"
+							>{z.sessions7}</td
+						>
+						<td class="px-3 py-1.5 text-right text-slate-600 tabular-nums"
+							>{datumKurz(z.zuletzt)}</td
+						>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+
+	<div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-600">
+		{#each ['grau', 'gelb', 'gruen', 'rot'] as const as st (st)}
+			<span class="flex items-center gap-1.5"
+				><StatusZelle status={st} titel={STATUS_TEXT[st]} /> {STATUS_TEXT[st]}</span
+			>
+		{/each}
+		<span>Grün: Stabilität über 21 Tage. Rot: mindestens zweimal Again in Folge.</span>
+	</div>
+
+	{#if data.fehlerbilder.length > 0}
+		<section class="mt-6 max-w-3xl">
+			<h3 class="mb-2 font-semibold">Häufigste Fehlerbilder der Gruppe (28 Tage)</h3>
+			<ul class="space-y-1 text-sm">
+				{#each data.fehlerbilder as f (f.tag)}
+					<li class="flex gap-3">
+						<span class="w-10 text-right tabular-nums">{f.n}×</span><span>{f.text}</span>
+					</li>
+				{/each}
+			</ul>
 		</section>
 	{/if}
-
-	<div class="grid gap-8 md:grid-cols-2">
-		<section>
-			<h2 class="mb-3 text-lg font-semibold">Schüler ({data.students.length})</h2>
-			{#if data.students.length === 0}
-				<p class="text-slate-600">Noch keine Schüler.</p>
-			{:else}
-				<ul class="divide-y divide-slate-200 rounded border border-slate-200 bg-white">
-					{#each data.students as s (s.id)}
-						<li class="px-4 py-2">{s.label}</li>
-					{/each}
-				</ul>
-			{/if}
-		</section>
-
-		<section class="flex flex-col gap-8">
-			<form method="POST" action="?/addStudents" use:enhance class="flex flex-col gap-2">
-				<label class="flex flex-col gap-1">
-					<span class="font-semibold">Schüler hinzufügen</span>
-					<span class="text-sm text-slate-600"
-						>Ein Kürzel pro Zeile, z. B. „L. M.“ oder „Schüler 07“. Keine vollen Namen nötig.</span
-					>
-					<textarea name="labels" rows="6" class="input font-mono"></textarea>
-				</label>
-				<button class="btn-primary self-start">Anlegen und Codes erzeugen</button>
-			</form>
-
-			<form method="POST" action="?/rename" use:enhance class="flex items-end gap-2">
-				<label class="flex flex-1 flex-col gap-1">
-					<span class="font-semibold">Gruppe umbenennen</span>
-					<input name="name" required maxlength="80" value={data.group.name} class="input" />
-				</label>
-				<button class="btn-secondary">Speichern</button>
-			</form>
-
-			<form method="POST" action="?/track" use:enhance class="flex items-end gap-2">
-				<label class="flex flex-1 flex-col gap-1">
-					<span class="font-semibold">Freigegeben bis Woche</span>
-					<select name="activeTrack" class="input" value={data.group.activeTrack}>
-						{#each [1, 2, 3, 4, 5, 6] as w (w)}<option value={w}>Woche {w}</option>{/each}
-					</select>
-				</label>
-				<button class="btn-secondary">Speichern</button>
-			</form>
-		</section>
-	</div>
-</main>
+{/if}

@@ -15,7 +15,7 @@
 				type="email"
 				required
 				autocomplete="username"
-				value={form?.email ?? ''}
+				defaultValue={form?.email ?? ''}
 				class="input"
 			/>
 		</label>

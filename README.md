@@ -11,7 +11,8 @@ Web-App für tägliche 5-Minuten-Übungen zum Stellenwertverständnis (Klasse 5�
 | 3   | Generatoren und Fehlertypen Wochen 1–3 mit Tests          | fertig, 8 Generatoren, je 200 Items pro Parametersatz geprüft           |
 | 4   | Eingabekomponenten, SVG-Material, Animationen, Session-Flow | fertig, Playwright löst 10+5 Aufgaben nur mit Tipps in der unteren Hälfte; Prüfung auf echtem Handy offen |
 | 5   | FSRS, Einführungsmodus, Freischaltung, Sessionaufbau      | fertig, 30-Tage-Simulation mit vier Schülerprofilen als Test            |
-| 6–8 | Dashboard, PDF, PWA                                       | offen                                                                   |
+| 6   | Dashboard: Übersicht, Schülerprofil, Fehlerbilder, CSV    | fertig, Farbmatrix und „ohne Scrollen“ (1366×660, 1280×620) per Playwright geprüft |
+| 7–8 | Code-PDF, Archivierung, Generatoren Woche 4–6, PWA        | offen                                                                   |
 
 ## Entwicklung
 
@@ -23,7 +24,7 @@ npx npm@11 install        # npm 10.9 bricht hier mit „reading 'edgesOut'“ ab
 initdb -D .pgdata -U swt --auth=trust -E UTF8 --locale=C.UTF-8
 mkdir -p .pgsock && npm run db:start
 createdb -h $PWD/.pgsock -U swt stellenwert
-cp .env.example .env      # DATABASE_URL und SECRET_KEY eintragen
+cp .env.example .env      # DATABASE_URL, SECRET_KEY und ORIGIN eintragen
 npm run teacher:create -- lehrer@schule.de
 npm run dev               # Lehrer-Zugang unter /lehrer
 ```
@@ -47,7 +48,9 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test`
   - `simulation.ts`: simulierter Schüler; `simulation.test.ts` ist die Abnahme von M5
 - `src/routes/ueben/`: Session-Ablauf; `src/routes/api/session/*`, `api/attempt`: signierte Aufträge, serverseitige Bewertung
 - `src/lib/server/auth/`: Codes (Argon2id-Hash plus HMAC-Kurzindex), signierte Cookies, Rate Limit
-- `src/routes/lehrer/`: Lehrer-Oberfläche
+- `src/routes/lehrer/`: Lehrer-Oberfläche; `gruppen/[id]` Übersicht (Farbmatrix), `gruppen/[id]/verwaltung`, `schueler/[id]` Profil
+- `src/lib/server/dashboard/daten.ts`: Abfragen fürs Dashboard; `src/lib/dashboard/regeln.ts`: Zellfarbe, Median, CSV (getestet)
+- `src/routes/api/teacher/gruppen/[id]/stand.csv` und `fehler.csv`: Exporte
 
 ## Geklärte offene Entscheidungen (25.09.2026)
 
@@ -72,6 +75,12 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test`
 - **Sessionaufbau:** Aufwärmen 2 Aufgaben, bei zwei fälligen Karten nur 1, damit es bei höchstens 12 Aufgaben bleibt. Der Einführungsblock (3 begleitete + 5 Prüfung, dazu 2 Beispiele zum Zuschauen) kommt nur, wenn er noch passt, also praktisch nur an Tagen ohne fällige Karte. Unter 8 Aufgaben wird mit freiem Üben aufgefüllt (ohne FSRS-Wirkung).
 - **Bewertung am Sessionende**, in einer Transaktion und idempotent. Liegengebliebene Sessions (App geschlossen) werden vor der nächsten Session abgeschlossen; unvollständige Runden bleiben ohne Wirkung, die Karte bleibt fällig.
 - **Verlängerung:** nächste fällige Karte, die heute noch nicht dran war; sonst freies Üben.
+- **Rot = zweimal Again in Folge**, gezählt in `card.again_in_folge` (auch nicht bestandene Prüfrunden der Einführung). Rot hat Vorrang vor Grün. Jede Zelle trägt zusätzlich ein Zeichen (✓ · !), damit sie ohne Rot-Grün-Sehen lesbar ist.
+- **Kennzahlen über 7 Tage:** aktiv = mindestens eine Antwort; Median der Sessions über alle Kinder der Gruppe, auch die ohne Session.
+- **Fehlerbilder über 4 Wochen**, die Liste der letzten zehn Fehlversuche ohne Zeitgrenze (bis zur Löschung nach 12 Monaten). Die Aufgabe wird aus Skill, Parametern und Seed neu erzeugt und als Text gezeigt.
+- **CSV für deutsches Excel:** Semikolon, Dezimalkomma, UTF-8 mit BOM; Zellen mit führendem `=`, `+`, `-`, `@` werden entschärft.
+- **`ORIGIN` ist in Produktion Pflicht** (z. B. `https://stellenwert.example.de`): adapter-node nimmt sonst `https` an, und SvelteKit weist Formulare (Lehrer-Login) als Cross-Site ab.
+- **Platz im Schülerprofil:** Bei 8 Skills bleibt es bei 1366×660 ohne Scrollen. Mit den 12 Skills aus M8 wird die Skill-Liste um vier Zeilen länger; dann dort zweispaltig oder kompakter darstellen.
 - **Lehrer-Oberfläche nutzt SvelteKit-Form-Actions** statt `/api/teacher/*`. Die JSON-Endpunkte kommen dazu, wenn sie gebraucht werden (Exporte).
 - **Zusätzliche Fehlertypen** über die Beispieltabelle hinaus, z. B. `nullstelle_fehlt`, `verkettet` (300 und 5 → 3005), `gerundet`, `kein_entbuendeln`. Liste in `fehler.ts`.
 - **`tauschen_entbuendeln`:** Die Antwort ist der Materialzustand nach dem Tauschen. Richtig ist jeder wertgleiche Zustand, in dem jede Spalte für die Wegnahme reicht. Mehr zu tauschen als nötig gilt nicht als Fehler.

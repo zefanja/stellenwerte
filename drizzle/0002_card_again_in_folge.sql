@@ -1,0 +1,1 @@
+ALTER TABLE "card" ADD COLUMN "again_in_folge" smallint DEFAULT 0 NOT NULL;

@@ -17,7 +17,7 @@ export default defineConfig({
 	webServer: {
 		command: 'npm run build && node --env-file=.env build',
 		port: 4173,
-		env: { DATABASE_URL: TEST_DATABASE_URL, PORT: '4173' },
+		env: { DATABASE_URL: TEST_DATABASE_URL, PORT: '4173', ORIGIN: 'http://localhost:4173' },
 		reuseExistingServer: false
 	}
 });

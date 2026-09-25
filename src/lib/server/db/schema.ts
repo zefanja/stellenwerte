@@ -73,7 +73,9 @@ export const card = pgTable(
 		lapses: integer('lapses').notNull().default(0),
 		/** ts-fsrs State: 0 New, 1 Learning, 2 Review, 3 Relearning */
 		state: smallint('state').notNull().default(0),
-		introducedAt: timestamp('introduced_at', { withTimezone: true })
+		introducedAt: timestamp('introduced_at', { withTimezone: true }),
+		/** Again-Bewertungen in Folge (auch nicht bestandene Prüfrunden); ab 2 rot im Dashboard */
+		againInFolge: smallint('again_in_folge').notNull().default(0)
 	},
 	(t) => [uniqueIndex('card_student_skill_uq').on(t.studentId, t.skillId)]
 );
