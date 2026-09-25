@@ -2,7 +2,15 @@ import { expect, test } from '@playwright/test';
 import { datenbank, tippeUnten } from './hilfen';
 import { loese } from './loesen';
 import { SCHUELER_OFFLINE } from './testdaten';
+import type { Page } from '@playwright/test';
 import type { SessionAntwort } from '../src/lib/training';
+
+/** ready löst schon im Zustand „activating“ aus; für die Tests braucht es einen fertig aktivierten Worker */
+async function serviceWorkerAktiv(page: Page) {
+	await page.waitForFunction(
+		async () => (await navigator.serviceWorker.ready).active?.state === 'activated'
+	);
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -25,9 +33,7 @@ test('PWA: Manifest mit Icons, Service Worker aktiv', async ({ page }) => {
 		'href',
 		/manifest\.webmanifest$/
 	);
-	expect(await page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state)).toBe(
-		'activated'
-	);
+	await serviceWorkerAktiv(page);
 });
 
 test('Session läuft ohne Netz zu Ende und synchronisiert danach', async ({ page, context }) => {
@@ -40,11 +46,9 @@ test('Session läuft ohne Netz zu Ende und synchronisiert danach', async ({ page
 	).toBe(true);
 	// Service Worker installieren und die Seiten einmal online laden, damit sie im Cache liegen
 	await page.goto('/');
-	await page.evaluate(async () => {
-		await navigator.serviceWorker.ready;
-	});
+	await serviceWorkerAktiv(page);
 	await page.reload();
-	expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+	await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 
 	const [antwort] = await Promise.all([
 		page.waitForResponse((r) => r.url().includes('/api/session/next')),
