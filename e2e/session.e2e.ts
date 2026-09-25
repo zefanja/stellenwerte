@@ -3,6 +3,7 @@ import { SKILLS } from '../src/lib/skills/katalog';
 import { STELLEN, STELLENNAME, normiert } from '../src/lib/skills/material';
 import type { Auftrag, SessionAntwort } from '../src/lib/training';
 import { anmelden, datenbank, tippeUnten } from './hilfen';
+import { SCHUELER } from './testdaten';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -92,7 +93,8 @@ test('erste Session: Einführung einhändig lösbar, Verlängerung, danach FSRS-
 		await sql`select correct, hint_used, block from attempt where session_id = ${erste.session_id}`;
 	const [karte] = await sql`select state, reps, introduced_at,
 		(due at time zone 'Europe/Berlin')::date - (now() at time zone 'Europe/Berlin')::date as tage
-		from card where skill_id = 'buendeln_100'`;
+		from card join student on student.id = card.student_id
+		where card.skill_id = 'buendeln_100' and student.label = ${SCHUELER.label}`;
 	await sql.end();
 	// 3 begleitete + 5 Prüfung + 5 Verlängerung; Beispiele werden nicht beantwortet
 	expect(s.finished_at).not.toBeNull();
