@@ -14,4 +14,6 @@
 
 body {
 	@apply bg-slate-50 text-slate-900;
+	/* kein Doppeltipp-Zoom, keine Tippverzögerung */
+	touch-action: manipulation;
 }

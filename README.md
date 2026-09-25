@@ -7,8 +7,9 @@ Web-App für tägliche 5-Minuten-Übungen zum Stellenwertverständnis (Klasse 5�
 | M   | Inhalt                                                    | Stand                                                                   |
 | --- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 1   | Gerüst, Datenmodell, Migrationen, Lehrer-Login, Gruppen/Schüler | fertig                                                                  |
+| 2   | Schüler-Login mit Ziffernblock, Cookie, „Bist du das?“    | fertig, Playwright-Test im Handy-Format; Prüfung auf echtem Handy offen |
 | 3   | Generatoren und Fehlertypen Wochen 1–3 mit Tests          | fertig, 8 Generatoren, je 200 Items pro Parametersatz geprüft           |
-| 2, 4–8 | Schüler-Login, Oberfläche, FSRS, Dashboard, PDF, PWA  | offen                                                                   |
+| 4–8 | Oberfläche, FSRS, Dashboard, PDF, PWA                     | offen                                                                   |
 
 ## Entwicklung
 
@@ -27,7 +28,7 @@ npm run dev               # Lehrer-Zugang unter /lehrer
 
 `DATABASE_URL` wählt einen Socket-Ordner über `?host=/pfad` (siehe `src/lib/server/db/connection.js`). Migrationen liegen in `drizzle/` und laufen beim Serverstart. Schemaänderungen: `schema.ts` ändern, dann `npm run db:generate`.
 
-Tests: `npx vitest run` (Generatoren, Rate Limit), `npm run check`, `npx eslint .`
+Tests: `npx vitest run` (Generatoren, Rate Limit), `npx playwright test` (Login-Flow im Pixel-7-Format gegen die Datenbank `stellenwert_test`, vorher `createdb -h $PWD/.pgsock -U swt stellenwert_test`), `npm run check`, `npx eslint .`
 
 ## Aufbau
 
@@ -48,6 +49,8 @@ Tests: `npx vitest run` (Generatoren, Rate Limit), `npm run check`, `npx eslint 
 - **Rate Limit zählt nur Fehlversuche.** Sonst sperrt sich eine Klasse hinter einer Schul-IP beim gemeinsamen Anmelden selbst.
 - **Sessions ohne eigene Tabelle.** Cookies sind HMAC-signiert (Lehrkraft 12 h, Schüler 180 Tage). Schüler-Cookies, die vor `code_last_rotated` ausgestellt wurden, werden abgewiesen. So bleibt es bei sechs Tabellen, und ein Codewechsel meldet sofort ab.
 - **Zusätzliche Spalte `student.code_index`** für den HMAC-Kurzindex aus der Spezifikation.
+- **Schüler-Login zweistufig:** `POST /api/login` mit `{ code }` liefert nur das Label für „Bist du das?“; erst `{ code, bestaetigt: true }` setzt das Cookie.
+- **Ziffernblock bleibt gesperrt, bis die Seite interaktiv ist**, damit auf langsamen Handys keine Tipps verloren gehen.
 - **Lehrer-Oberfläche nutzt SvelteKit-Form-Actions** statt `/api/teacher/*`. Die JSON-Endpunkte kommen dazu, wenn sie gebraucht werden (Exporte).
 - **Zusätzliche Fehlertypen** über die Beispieltabelle hinaus, z. B. `nullstelle_fehlt`, `verkettet` (300 und 5 → 3005), `gerundet`, `kein_entbuendeln`. Liste in `fehler.ts`.
 - **`tauschen_entbuendeln`:** Die Antwort ist der Materialzustand nach dem Tauschen. Richtig ist jeder wertgleiche Zustand, in dem jede Spalte für die Wegnahme reicht. Mehr zu tauschen als nötig gilt nicht als Fehler.
