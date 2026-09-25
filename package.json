@@ -21,7 +21,8 @@
 		"db:studio": "drizzle-kit studio",
 		"db:start": "pg_ctl -D .pgdata -o \"-k $PWD/.pgsock -c listen_addresses=''\" -l .pgdata/log.txt start",
 		"db:stop": "pg_ctl -D .pgdata stop",
-		"teacher:create": "node --env-file=.env scripts/create-teacher.mjs"
+		"teacher:create": "node --env-file=.env scripts/create-teacher.mjs",
+		"aufraeumen": "node --env-file=.env scripts/aufraeumen.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -31,11 +32,15 @@
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^22",
+		"@types/pngjs": "^6.0.5",
+		"@types/qrcode": "^1.5.6",
 		"drizzle-kit": "^0.31.10",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
 		"globals": "^17.6.0",
+		"jsqr": "^1.4.0",
+		"pngjs": "^7.0.0",
 		"prettier": "^3.8.3",
 		"prettier-plugin-svelte": "^4.1.0",
 		"prettier-plugin-tailwindcss": "^0.8.0",
@@ -49,9 +54,11 @@
 	},
 	"dependencies": {
 		"@node-rs/argon2": "^2.2.1",
-		"ts-fsrs": "^5.4.2",
 		"drizzle-orm": "^0.45.3",
-		"postgres": "^3.4.9"
+		"pdf-lib": "^1.17.1",
+		"postgres": "^3.4.9",
+		"qrcode": "^1.5.4",
+		"ts-fsrs": "^5.4.2"
 	},
 	"allowScripts": {
 		"esbuild@0.18.20": true,

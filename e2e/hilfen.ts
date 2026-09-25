@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import postgres from 'postgres';
 import { pgOptions } from '../src/lib/server/db/connection.js';
 import { TEST_DATABASE_URL } from '../playwright.config';
-import { SCHUELER } from './testdaten';
+import { LEHRKRAFT, SCHUELER } from './testdaten';
 
 /** Code nur per Antippen des Ziffernblocks eingeben, wie ein Kind am Handy */
 export async function tippeCode(page: Page, code: string) {
@@ -32,4 +32,12 @@ export async function tippeUnten(page: Page, ziel: Locator) {
 
 export function datenbank() {
 	return postgres({ ...pgOptions(TEST_DATABASE_URL), onnotice: () => {} });
+}
+
+export async function lehrerLogin(page: Page) {
+	await page.goto('/lehrer');
+	await page.getByLabel('E-Mail').fill(LEHRKRAFT.email);
+	await page.getByLabel('Passwort').fill(LEHRKRAFT.password);
+	await page.getByRole('button', { name: 'Anmelden' }).click();
+	await expect(page).toHaveURL('/lehrer/gruppen');
 }

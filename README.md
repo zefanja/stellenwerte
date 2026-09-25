@@ -12,7 +12,8 @@ Web-App für tägliche 5-Minuten-Übungen zum Stellenwertverständnis (Klasse 5�
 | 4   | Eingabekomponenten, SVG-Material, Animationen, Session-Flow | fertig, Playwright löst 10+5 Aufgaben nur mit Tipps in der unteren Hälfte; Prüfung auf echtem Handy offen |
 | 5   | FSRS, Einführungsmodus, Freischaltung, Sessionaufbau      | fertig, 30-Tage-Simulation mit vier Schülerprofilen als Test            |
 | 6   | Dashboard: Übersicht, Schülerprofil, Fehlerbilder, CSV    | fertig, Farbmatrix und „ohne Scrollen“ (1366×660, 1280×620) per Playwright geprüft |
-| 7–8 | Code-PDF, Archivierung, Generatoren Woche 4–6, PWA        | offen                                                                   |
+| 7   | Code-PDF mit QR, Codewechsel, Archivierung, Löschen, JSON-Auskunft | fertig, PDF per Poppler geprüft, QR-Codes aus dem gerenderten Bild gelesen und zum Login benutzt |
+| 8   | Generatoren Woche 4–6, PWA, Offline-Puffer, Deployment    | offen                                                                   |
 
 ## Entwicklung
 
@@ -31,7 +32,7 @@ npm run dev               # Lehrer-Zugang unter /lehrer
 
 `DATABASE_URL` wählt einen Socket-Ordner über `?host=/pfad` (siehe `src/lib/server/db/connection.js`). Migrationen liegen in `drizzle/` und laufen beim Serverstart. Schemaänderungen: `schema.ts` ändern, dann `npm run db:generate`.
 
-Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test` (Login und komplette Session im Pixel-7-Format gegen die Datenbank `stellenwert_test`, vorher `createdb -h $PWD/.pgsock -U swt stellenwert_test`), `npm run check`, `npx eslint .`
+Tests: `npx vitest run` (Generatoren, Layout, Rate Limit, FSRS, PDF), `npx playwright test` (braucht Poppler: `pdftotext`, `pdftoppm`) (Login und komplette Session im Pixel-7-Format gegen die Datenbank `stellenwert_test`, vorher `createdb -h $PWD/.pgsock -U swt stellenwert_test`), `npm run check`, `npx eslint .`
 
 ## Aufbau
 
@@ -51,6 +52,9 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test`
 - `src/routes/lehrer/`: Lehrer-Oberfläche; `gruppen/[id]` Übersicht (Farbmatrix), `gruppen/[id]/verwaltung`, `schueler/[id]` Profil
 - `src/lib/server/dashboard/daten.ts`: Abfragen fürs Dashboard; `src/lib/dashboard/regeln.ts`: Zellfarbe, Median, CSV (getestet)
 - `src/routes/api/teacher/gruppen/[id]/stand.csv` und `fehler.csv`: Exporte
+- `src/lib/server/codes/`: Codekarten-PDF (pdf-lib, QR mit `qrcode`) und Ablage der Klartext-Codes für den Druck
+- `src/lib/server/verwaltung.ts`: Codewechsel, Verschieben, Archivieren, Löschen, JSON-Auskunft
+- `scripts/aufraeumen.mjs` (`npm run aufraeumen`): löscht Antworten älter als 12 Monate, für die Crontab
 
 ## Geklärte offene Entscheidungen (25.09.2026)
 
@@ -81,6 +85,11 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test`
 - **CSV für deutsches Excel:** Semikolon, Dezimalkomma, UTF-8 mit BOM; Zellen mit führendem `=`, `+`, `-`, `@` werden entschärft.
 - **`ORIGIN` ist in Produktion Pflicht** (z. B. `https://stellenwert.example.de`): adapter-node nimmt sonst `https` an, und SvelteKit weist Formulare (Lehrer-Login) als Cross-Site ab.
 - **Platz im Schülerprofil:** Bei 8 Skills bleibt es bei 1366×660 ohne Scrollen. Mit den 12 Skills aus M8 wird die Skill-Liste um vier Zeilen länger; dann dort zweispaltig oder kompakter darstellen.
+- **Klartext-Codes nur im Speicher:** Beim Anlegen oder Codewechsel stehen die Codes einmal auf dem Bildschirm und 15 Minuten lang unter einem Einmal-Link als PDF bereit, nur für die erzeugende Lehrkraft, nur im Speicher des Node-Prozesses (`cache-control: no-store`). Danach, oder nach einem Neustart, gibt es sie nicht mehr; ein neues PDF heißt neue Codes.
+- **Archivieren** entfernt Code und Kürzel (`label = 'archiviert'`). Die Lehrkraft wählt dabei: Lernstand anonym behalten (für Statistik; Antworten fallen nach 12 Monaten ohnehin weg) oder alles löschen. „Schuljahresende“ archiviert die ganze Gruppe.
+- **Löschen** entfernt den Schüler mit Karten, Sessions und allen Antworten (Fremdschlüssel mit `ON DELETE CASCADE`).
+- **Hinter dem Uberspace-Proxy `ADDRESS_HEADER=X-Forwarded-For` und `XFF_DEPTH=1` setzen**, sonst sehen alle Kinder für das Login-Rate-Limit wie eine IP aus, und zehn Fehlversuche irgendwo sperren alle.
+- **Noch offen aus dem Datenschutz-Abschnitt:** Zwei-Faktor-Option für Lehrkräfte (steht in keinem Meilenstein; Vorschlag: TOTP, zusammen mit M8).
 - **Lehrer-Oberfläche nutzt SvelteKit-Form-Actions** statt `/api/teacher/*`. Die JSON-Endpunkte kommen dazu, wenn sie gebraucht werden (Exporte).
 - **Zusätzliche Fehlertypen** über die Beispieltabelle hinaus, z. B. `nullstelle_fehlt`, `verkettet` (300 und 5 → 3005), `gerundet`, `kein_entbuendeln`. Liste in `fehler.ts`.
 - **`tauschen_entbuendeln`:** Die Antwort ist der Materialzustand nach dem Tauschen. Richtig ist jeder wertgleiche Zustand, in dem jede Spalte für die Wegnahme reicht. Mehr zu tauschen als nötig gilt nicht als Fehler.

@@ -1,17 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { DASHBOARD, LEHRKRAFT } from './testdaten';
+import { DASHBOARD } from './testdaten';
+import { lehrerLogin } from './hilfen';
 
 // Lehrkraft am Laptop: 1366×768 abzüglich Browserleisten
 test.use({ viewport: { width: 1366, height: 660 }, isMobile: false, hasTouch: false });
 test.describe.configure({ mode: 'serial' });
-
-async function lehrerLogin(page: Page) {
-	await page.goto('/lehrer');
-	await page.getByLabel('E-Mail').fill(LEHRKRAFT.email);
-	await page.getByLabel('Passwort').fill(LEHRKRAFT.password);
-	await page.getByRole('button', { name: 'Anmelden' }).click();
-	await expect(page).toHaveURL('/lehrer/gruppen');
-}
 
 async function oeffneGruppe(page: Page) {
 	await page.getByRole('link', { name: DASHBOARD.gruppe }).click();

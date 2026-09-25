@@ -1,9 +1,16 @@
 import { fail } from '@sveltejs/kit';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { student, studentGroup } from '$lib/server/db/schema';
 import { requireOwnGroup } from '$lib/server/auth/guard';
-import { assignNewCodes } from '$lib/server/auth/codes';
+import {
+	archivieren,
+	einSchuelerDerGruppe,
+	loeschen,
+	neueCodes,
+	schuelerDerGruppe,
+	verschieben
+} from '$lib/server/verwaltung';
 import type { Actions, PageServerLoad } from './$types';
 
 const MAX_LABEL = 40;
@@ -11,14 +18,18 @@ const MAX_PER_REQUEST = 60;
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const group = await requireOwnGroup(locals, params.id);
-	const students = await db
-		.select({ id: student.id, label: student.label, hasCode: student.codeHash })
-		.from(student)
-		.where(and(eq(student.groupId, group.id), eq(student.archived, false)))
-		.orderBy(asc(student.label));
+	const [students, andereGruppen] = await Promise.all([
+		schuelerDerGruppe(group.id),
+		db
+			.select({ id: studentGroup.id, name: studentGroup.name })
+			.from(studentGroup)
+			.where(and(eq(studentGroup.teacherId, locals.teacher!.id), ne(studentGroup.id, group.id)))
+			.orderBy(asc(studentGroup.name))
+	]);
 	return {
 		group: { id: group.id, name: group.name, activeTrack: group.activeTrack },
-		students: students.map((s) => ({ id: s.id, label: s.label, hasCode: s.hasCode !== null }))
+		students,
+		andereGruppen
 	};
 };
 
@@ -41,8 +52,7 @@ export const actions: Actions = {
 
 	addStudents: async ({ locals, params, request }) => {
 		const group = await requireOwnGroup(locals, params.id);
-		const raw = String((await request.formData()).get('labels') ?? '');
-		const labels = raw
+		const labels = String((await request.formData()).get('labels') ?? '')
 			.split(/\r?\n/)
 			.map((l) => l.trim())
 			.filter(Boolean);
@@ -58,8 +68,50 @@ export const actions: Actions = {
 			.insert(student)
 			.values(labels.map((label) => ({ groupId: group.id, label })))
 			.returning({ id: student.id, label: student.label });
-		const codes = await assignNewCodes(created.map((s) => s.id));
-		// Klartext-Codes verlassen den Server genau einmal, in dieser Antwort.
-		return { newCodes: created.map((s) => ({ label: s.label, code: codes.get(s.id)! })) };
+		return neueCodes(locals.teacher!.id, created);
+	},
+
+	/** Neuer Code für einen Schüler, oder ohne `student` für die ganze Gruppe */
+	codes: async ({ locals, params, request }) => {
+		const group = await requireOwnGroup(locals, params.id);
+		const id = (await request.formData()).get('student');
+		const schueler = id
+			? [await einSchuelerDerGruppe(group.id, id)]
+			: await schuelerDerGruppe(group.id);
+		if (schueler.length === 0) return fail(400, { message: 'Keine Schüler in dieser Gruppe.' });
+		return neueCodes(locals.teacher!.id, schueler);
+	},
+
+	move: async ({ locals, params, request }) => {
+		const group = await requireOwnGroup(locals, params.id);
+		const form = await request.formData();
+		const s = await einSchuelerDerGruppe(group.id, form.get('student'));
+		await verschieben(locals.teacher!.id, s.id, form.get('ziel'));
+		return { message: `${s.label} wurde verschoben.` };
+	},
+
+	/** Archivieren eines Schülers, oder ohne `student` der ganzen Gruppe (Schuljahresende) */
+	archive: async ({ locals, params, request }) => {
+		const group = await requireOwnGroup(locals, params.id);
+		const form = await request.formData();
+		const id = form.get('student');
+		const schueler = id
+			? [await einSchuelerDerGruppe(group.id, id)]
+			: await schuelerDerGruppe(group.id);
+		const behalten = form.get('daten') !== 'loeschen';
+		await archivieren(
+			schueler.map((s) => s.id),
+			behalten
+		);
+		return {
+			message: `${schueler.length} archiviert${behalten ? ', Lernstand anonymisiert behalten' : ', alle Daten gelöscht'}.`
+		};
+	},
+
+	delete: async ({ locals, params, request }) => {
+		const group = await requireOwnGroup(locals, params.id);
+		const s = await einSchuelerDerGruppe(group.id, (await request.formData()).get('student'));
+		await loeschen([s.id]);
+		return { message: `${s.label} und alle zugehörigen Daten wurden gelöscht.` };
 	}
 };
