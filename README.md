@@ -13,7 +13,7 @@ Web-App für tägliche 5-Minuten-Übungen zum Stellenwertverständnis (Klasse 5�
 | 5   | FSRS, Einführungsmodus, Freischaltung, Sessionaufbau      | fertig, 30-Tage-Simulation mit vier Schülerprofilen als Test            |
 | 6   | Dashboard: Übersicht, Schülerprofil, Fehlerbilder, CSV    | fertig, Farbmatrix und „ohne Scrollen“ (1366×660, 1280×620) per Playwright geprüft |
 | 7   | Code-PDF mit QR, Codewechsel, Archivierung, Löschen, JSON-Auskunft | fertig, PDF per Poppler geprüft, QR-Codes aus dem gerenderten Bild gelesen und zum Login benutzt |
-| 8   | Generatoren Woche 4–6, PWA, Offline-Puffer, Deployment    | offen                                                                   |
+| 8   | Generatoren Woche 4–6, PWA, Offline-Puffer, Deployment    | fertig, Offline-Session per Playwright geprüft; Deployment beschrieben in `docs/BETRIEB.md`, auf Uberspace noch nicht ausgeführt |
 
 ## Entwicklung
 
@@ -34,10 +34,14 @@ npm run dev               # Lehrer-Zugang unter /lehrer
 
 Tests: `npx vitest run` (Generatoren, Layout, Rate Limit, FSRS, PDF), `npx playwright test` (braucht Poppler: `pdftotext`, `pdftoppm`) (Login und komplette Session im Pixel-7-Format gegen die Datenbank `stellenwert_test`, vorher `createdb -h $PWD/.pgsock -U swt stellenwert_test`), `npm run check`, `npx eslint .`
 
+## Betrieb
+
+Einrichtung auf Uberspace, Updates, Backups und Datenschutz-Checkliste: [`docs/BETRIEB.md`](docs/BETRIEB.md).
+
 ## Aufbau
 
 - `src/lib/skills/`: Skill-Katalog und Aufgabengeneratoren, reine Funktionen, laufen auf Server und Client
-  - `katalog.ts`: 12 Skills mit Woche, Voraussetzungen, Eingabetyp und Zielzeit; Wochen 4–5 haben noch `generator: null`
+  - `katalog.ts`: 12 Skills mit Woche, Voraussetzungen, Eingabetyp, Zielzeit und den Dezimal-Parametern für Woche 6 (`params_woche6`)
   - `generatoren/<skill_id>.ts`: `generate(params, seed)`, `bewerte(item, antwort)` und `baue(...)` für feste Beispiele
   - `fehler.ts`: alle `error_tag`s mit Klartext fürs Dashboard
 - `src/lib/material/`: SVG-Material, Layout der Stellenwerttafel (`layout.ts`, getestet), animiertes Modell mit Bündeln, Entbündeln, Legen und „Material zu Zahl“ (`modell.svelte.ts`), Gesten
@@ -54,6 +58,9 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit, FSRS, PDF), `npx playw
 - `src/routes/api/teacher/gruppen/[id]/stand.csv` und `fehler.csv`: Exporte
 - `src/lib/server/codes/`: Codekarten-PDF (pdf-lib, QR mit `qrcode`) und Ablage der Klartext-Codes für den Druck
 - `src/lib/server/verwaltung.ts`: Codewechsel, Verschieben, Archivieren, Löschen, JSON-Auskunft
+- `src/service-worker.ts`, `static/manifest.webmanifest`, `static/icons/` (erzeugt mit `scripts/icons.py`): PWA
+- `src/lib/postausgang.ts`: Warteschlange für Antworten im localStorage; `src/lib/sitzung.ts`: laufende Session auf dem Gerät
+- `deploy/`: supervisord-Dienste, `aktualisieren.sh`, `backup.sh` (pg_dump + gpg), Crontab
 - `scripts/aufraeumen.mjs` (`npm run aufraeumen`): löscht Antworten älter als 12 Monate, für die Crontab
 
 ## Geklärte offene Entscheidungen (25.09.2026)
@@ -73,7 +80,6 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit, FSRS, PDF), `npx playw
 - **Zweiter Versuch = `hint_used`.** Nach einer falschen Antwort kommt dieselbe Aufgabe mit Material zum Tauschen; diese Antwort wird mit `hint_used = true` gespeichert. `session.item_count` und `correct_count` zählen nur erste Versuche.
 - **Verlängerung:** Nach 10 Aufgaben „Noch 5 Aufgaben“, höchstens dreimal (`MAX_VERLAENGERUNGEN`), in derselben Session.
 - **Bewegung an/aus** auf der Startseite, gespeichert auf dem Gerät; Standard folgt `prefers-reduced-motion`.
-- **Noch nicht in M4:** `StrahlRegler` und `Auswahlkarten` kommen mit den Generatoren der Woche 5, die Stellenwechsel-Animation (399 + 1) mit `stelle_veraendern` (Woche 4), jeweils in M8. Antworten ohne Netz werden bisher nur im Speicher wiederholt; die Ablage auf dem Gerät folgt mit dem Offline-Puffer (M8).
 - **FSRS tagesgenau:** `ts-fsrs` ohne Kurzzeitschritte und ohne Zufallsstreuung, `request_retention` 0,9, `maximum_interval` 120. Fällig ist eine Karte ab Mitternacht (Berlin) ihres Tages; nach Again immer am Folgetag (ts-fsrs selbst würde teils zwei Tage geben).
 - **Einführung:** Beim ersten Einplanen eines neuen Skills entsteht seine Karte mit `state = 0` und `introduced_at`. Die Prüfrunde macht daraus erst ab Hard eine FSRS-Karte; sonst bleibt der Skill im Einführungsmodus und kommt am nächsten Tag wieder. Es läuft höchstens eine Einführung zur Zeit.
 - **Sessionaufbau:** Aufwärmen 2 Aufgaben, bei zwei fälligen Karten nur 1, damit es bei höchstens 12 Aufgaben bleibt. Der Einführungsblock (3 begleitete + 5 Prüfung, dazu 2 Beispiele zum Zuschauen) kommt nur, wenn er noch passt, also praktisch nur an Tagen ohne fällige Karte. Unter 8 Aufgaben wird mit freiem Üben aufgefüllt (ohne FSRS-Wirkung).
@@ -84,12 +90,17 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit, FSRS, PDF), `npx playw
 - **Fehlerbilder über 4 Wochen**, die Liste der letzten zehn Fehlversuche ohne Zeitgrenze (bis zur Löschung nach 12 Monaten). Die Aufgabe wird aus Skill, Parametern und Seed neu erzeugt und als Text gezeigt.
 - **CSV für deutsches Excel:** Semikolon, Dezimalkomma, UTF-8 mit BOM; Zellen mit führendem `=`, `+`, `-`, `@` werden entschärft.
 - **`ORIGIN` ist in Produktion Pflicht** (z. B. `https://stellenwert.example.de`): adapter-node nimmt sonst `https` an, und SvelteKit weist Formulare (Lehrer-Login) als Cross-Site ab.
-- **Platz im Schülerprofil:** Bei 8 Skills bleibt es bei 1366×660 ohne Scrollen. Mit den 12 Skills aus M8 wird die Skill-Liste um vier Zeilen länger; dann dort zweispaltig oder kompakter darstellen.
+- **Schülerprofil:** Skill-Liste zweispaltig, damit alle zwölf Skills bei 1366×660 ohne Scrollen passen.
 - **Klartext-Codes nur im Speicher:** Beim Anlegen oder Codewechsel stehen die Codes einmal auf dem Bildschirm und 15 Minuten lang unter einem Einmal-Link als PDF bereit, nur für die erzeugende Lehrkraft, nur im Speicher des Node-Prozesses (`cache-control: no-store`). Danach, oder nach einem Neustart, gibt es sie nicht mehr; ein neues PDF heißt neue Codes.
 - **Archivieren** entfernt Code und Kürzel (`label = 'archiviert'`). Die Lehrkraft wählt dabei: Lernstand anonym behalten (für Statistik; Antworten fallen nach 12 Monaten ohnehin weg) oder alles löschen. „Schuljahresende“ archiviert die ganze Gruppe.
 - **Löschen** entfernt den Schüler mit Karten, Sessions und allen Antworten (Fremdschlüssel mit `ON DELETE CASCADE`).
 - **Hinter dem Uberspace-Proxy `ADDRESS_HEADER=X-Forwarded-For` und `XFF_DEPTH=1` setzen**, sonst sehen alle Kinder für das Login-Rate-Limit wie eine IP aus, und zehn Fehlversuche irgendwo sperren alle.
-- **Noch offen aus dem Datenschutz-Abschnitt:** Zwei-Faktor-Option für Lehrkräfte (steht in keinem Meilenstein; Vorschlag: TOTP, zusammen mit M8).
+- **Woche 6 als Parametererweiterung:** Ist eine Gruppe bis Woche 6 freigegeben, kommt etwa jede zweite Aufgabe von Bündel zählen, Zahlenstrahl und Vergleichen mit Dezimalzahlen. Gerechnet wird intern in ganzen Einheiten der kleinsten Stelle; Dezimalaufgaben haben (noch) kein Material, nur die Stellenwerttafel mit Komma-Spalte.
+- **Neue Fehlertypen in M8:** `ungenau` (Zahlenstrahl, innerhalb der doppelten Toleranz), `stelle_falsch_begruendet` (größere Zahl richtig, entscheidende Stelle falsch). Rechenketten werden am ersten falschen Schritt eingeordnet.
+- **Zahlenstrahl:** Beim Verorten ist der Strahl in der unteren Hälfte selbst der Regler; richtig innerhalb von `toleranz_prozent` der Länge (Standard 5 %). Im zweiten Versuch mit Zehnteleinteilung.
+- **Offline-Puffer:** Eine Session beginnt online (Aufträge vom Server), läuft dann ohne Netz zu Ende, auch nach Neuladen. Antworten und Abschluss warten im localStorage und gehen bei „online“, beim nächsten App-Start und vor der nächsten Planung raus. Der Server übernimmt die Antwortzeit des Geräts, wenn sie plausibel ist. Abmelden sendet erst und leert dann Sitzung und Seiten-Cache (geteilte Geräte).
+- **Content-Security-Policy** über SvelteKit (`script-src 'self'` mit Nonce, `frame-ancestors 'none'`); `style-src` erlaubt Inline-Styles, weil Svelte `style:`-Direktiven nutzt.
+- **Offen:** Zwei-Faktor-Option für Lehrkräfte (Datenschutz-Abschnitt der Spezifikation, in keinem Meilenstein); Prüfung aller Meilensteine auf echten Geräten.
 - **Lehrer-Oberfläche nutzt SvelteKit-Form-Actions** statt `/api/teacher/*`. Die JSON-Endpunkte kommen dazu, wenn sie gebraucht werden (Exporte).
 - **Zusätzliche Fehlertypen** über die Beispieltabelle hinaus, z. B. `nullstelle_fehlt`, `verkettet` (300 und 5 → 3005), `gerundet`, `kein_entbuendeln`. Liste in `fehler.ts`.
 - **`tauschen_entbuendeln`:** Die Antwort ist der Materialzustand nach dem Tauschen. Richtig ist jeder wertgleiche Zustand, in dem jede Spalte für die Wegnahme reicht. Mehr zu tauschen als nötig gilt nicht als Fehler.
