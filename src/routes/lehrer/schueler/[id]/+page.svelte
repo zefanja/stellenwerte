@@ -64,23 +64,22 @@
 
 			<section aria-label="Skills">
 				<h2 class="mb-2 font-semibold">Skills</h2>
-				<table class="w-full text-sm">
-					<tbody>
-						{#each data.skills as s (s.id)}
-							<tr class="border-b border-slate-100 last:border-0" data-skill={s.id}>
-								<td class="py-0.5"
-									><StatusZelle klein status={s.status} titel={STATUS_TEXT[s.status]} /></td
-								>
-								<td class="py-0.5 pl-2">{s.titel}</td>
-								<td class="py-0.5 text-right text-slate-600 tabular-nums">
-									{#if s.einfuehrung}in Einführung{:else if s.due}nächste Wiederholung {datumKurz(
+				<!-- zwei Spalten, damit alle zwölf Skills ohne Scrollen passen -->
+				<ul class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+					{#each data.skills as s (s.id)}
+						<li class="flex items-start gap-2" data-skill={s.id}>
+							<StatusZelle klein status={s.status} titel={STATUS_TEXT[s.status]} />
+							<span class="min-w-0 leading-tight">
+								<span class="block truncate" title={s.titel}>{s.titel}</span>
+								<span class="block text-xs text-slate-500 tabular-nums">
+									{#if s.einfuehrung}in Einführung{:else if s.due}wieder am {datumKurz(
 											s.due
-										)}{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+										)}{:else}&nbsp;{/if}
+								</span>
+							</span>
+						</li>
+					{/each}
+				</ul>
 			</section>
 		</div>
 
