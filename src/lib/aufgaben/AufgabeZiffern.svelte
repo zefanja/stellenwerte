@@ -7,15 +7,21 @@
 	import Tafel from '$lib/material/Tafel.svelte';
 	import Tauschflaeche from '$lib/material/Tauschflaeche.svelte';
 	import ZahlTafel from '$lib/material/ZahlTafel.svelte';
-	import { STELLEN, STELLENNAME } from '$lib/skills/material';
+	import { schrittStelle, stellenwechsel } from '$lib/material/ablaeufe';
+	import { normiert, STELLEN } from '$lib/skills/material';
+	import { STELLEN_NAME } from '$lib/skills/stellen';
+	import { zahlText } from '$lib/skills/text';
 	import type { Antwort, Item } from '$lib/skills/typen';
 	import { zahlwortGetrennt } from '$lib/skills/zahlwort';
 	import AntwortAnzeige from './AntwortAnzeige.svelte';
 	import AufgabeKopf from './AufgabeKopf.svelte';
-	import { hilfsmaterial, spaltenFuer, tauschRichtungen, type Modus } from './hilfe';
+	import { hilfsmaterial, spaltenFuer, tafelStelle, tauschRichtungen, type Modus } from './hilfe';
 	import Weiter from './Weiter.svelte';
 
-	/** Alle Aufgaben mit Ziffernblock: Material als Zahl, Zahlwort, nicht normiert, Bündel zählen und umkehren. */
+	/**
+	 * Alle Aufgaben mit Ziffernblock: Material als Zahl, Zahlwort, nicht normiert, Bündel zählen
+	 * und umkehren, Stelle verändern.
+	 */
 	interface Props {
 		item: Item;
 		modus: Modus;
@@ -26,6 +32,7 @@
 
 	let eingabe = $state('');
 	let fertig = $state(false);
+	let gelegt = $state(false);
 
 	const d = $derived(item.darstellung);
 	const loesung = $derived(item.loesung.typ === 'zahl' ? item.loesung.wert : 0);
@@ -39,7 +46,18 @@
 	function neuesModell(i: Item) {
 		const m = hilfsmaterial(i);
 		if (!m) return null;
-		const ziel = i.darstellung.typ === 'buendel' ? i.darstellung.stelle : undefined;
+		const d = i.darstellung;
+		if (d.typ === 'rechnung') {
+			// Platz für den Übertrag: Spalten nach der größeren der beiden Zahlen
+			const r = d.op === '+' ? d.zahl + d.schritt : d.zahl - d.schritt;
+			return new TafelModell(
+				m,
+				spaltenFuer(normiert(Math.max(d.zahl, r)), schrittStelle(d.schritt)),
+				true,
+				() => einstellungen.animationen
+			);
+		}
+		const ziel = d.typ === 'buendel' ? tafelStelle(d.stelle) : undefined;
 		return new TafelModell(m, spaltenFuer(m, ziel), true, () => einstellungen.animationen);
 	}
 	// Die Komponente wird je Aufgabe und Versuch neu erzeugt; das Modell gehört zu dieser Instanz.
@@ -53,11 +71,15 @@
 	});
 
 	async function zeigeLoesung() {
+		const ziel = zielStelle && tafelStelle(zielStelle);
 		if (modell) {
 			modell.zuruecksetzen();
-			if (zielStelle) {
-				await modell.entbuendelnBis(zielStelle);
-				modell.zaehler = zielStelle;
+			if (d.typ === 'rechnung') {
+				await stellenwechsel(modell, d.op, schrittStelle(d.schritt));
+				await modell.zuZiffern();
+			} else if (ziel) {
+				await modell.entbuendelnBis(ziel);
+				modell.zaehler = ziel;
 			} else {
 				await modell.normieren();
 				await modell.zuZiffern();
@@ -88,6 +110,11 @@
 			</p>
 		{:else if d.typ === 'buendel' && !zeigeTafel}
 			<ZahlTafel zahl={d.zahl} />
+		{:else if d.typ === 'rechnung'}
+			<p class="my-1 text-center text-4xl font-bold tabular-nums" data-testid="rechnung">
+				{zahlText(d.zahl)}&nbsp;{d.op}&nbsp;{zahlText(d.schritt)}
+			</p>
+			{#if !zeigeTafel}<ZahlTafel zahl={d.zahl} />{/if}
 		{/if}
 
 		{#if zeigeTafel && modell}
@@ -98,7 +125,7 @@
 
 		{#if modus === 'loesung' && fertig}
 			<p class="text-center text-4xl font-bold text-emerald-700" data-testid="loesung">
-				{loesung}{#if zielStelle}&nbsp;{STELLENNAME[zielStelle].mehrzahl}{/if}
+				{zahlText(loesung)}{#if zielStelle}&nbsp;{STELLEN_NAME[zielStelle]}{/if}
 			</p>
 		{/if}
 	</section>
@@ -107,7 +134,18 @@
 		{#if modus === 'loesung'}
 			<Weiter bereit={fertig} {onweiter} />
 		{:else}
-			{#if modus === 'hilfe' && modell && (richtungen.buendeln || richtungen.tauschen)}
+			{#if modus === 'hilfe' && modell && d.typ === 'rechnung'}
+				<!-- den Schritt selbst legen und den Stellenwechsel beobachten -->
+				<button
+					type="button"
+					class="min-h-12 rounded-xl bg-white text-lg font-semibold shadow disabled:opacity-35"
+					disabled={modell.beschaeftigt || gelegt}
+					onclick={async () => {
+						gelegt = true;
+						if (d.typ === 'rechnung') await stellenwechsel(modell, d.op, schrittStelle(d.schritt));
+					}}>{d.op} {zahlText(d.schritt)} legen</button
+				>
+			{:else if modus === 'hilfe' && modell && (richtungen.buendeln || richtungen.tauschen)}
 				<Tauschflaeche {modell} buendeln={richtungen.buendeln} tauschen={richtungen.tauschen} />
 			{/if}
 			<AntwortAnzeige wert={eingabe} />

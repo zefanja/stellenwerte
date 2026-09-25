@@ -33,13 +33,25 @@ export function hilfsmaterial(item: Item): Material | null {
 				? normiert(item.loesung.wert)
 				: null;
 		case 'buendel':
-			return d.zahl <= 9999 ? normiert(d.zahl) : null;
+			// Dezimalzahlen (Woche 6) ohne Material: die Tafel kennt nur ganze Stellen
+			return Number.isInteger(d.zahl) && d.zahl <= 9999 ? normiert(d.zahl) : null;
 		case 'buendel_umkehr':
 			return d.anzahl * { T: 1000, H: 100, Z: 10, E: 1 }[d.stelle] <= 99_999
 				? { [d.stelle]: d.anzahl }
 				: null;
+		case 'rechnung':
+			return normiert(d.zahl);
+		case 'kette':
+			return normiert(d.start);
+		case 'strahl':
+		case 'vergleich':
+			return null;
 	}
 }
+
+/** Ganze Stelle der Tafel oder undefined (Dezimalstellen haben kein Material) */
+export const tafelStelle = (s: string): Stelle | undefined =>
+	['T', 'H', 'Z', 'E'].includes(s) ? (s as Stelle) : undefined;
 
 /** Welche Tauschrichtungen im Hilfemodus sinnvoll sind */
 export function tauschRichtungen(item: Item): { buendeln: boolean; tauschen: boolean } {
@@ -50,6 +62,7 @@ export function tauschRichtungen(item: Item): { buendeln: boolean; tauschen: boo
 		case 'buendel':
 			return { buendeln: false, tauschen: true };
 		case 'wegnahme':
+		case 'rechnung':
 			return { buendeln: true, tauschen: true };
 		default:
 			return { buendeln: false, tauschen: false };

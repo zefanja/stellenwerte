@@ -18,10 +18,24 @@ describe('Skill-Katalog', () => {
 		}
 	});
 
-	it('Wochen 1 bis 3 haben einen Generator, der mit den Standardparametern läuft', () => {
-		for (const s of KATALOG.filter((s) => s.woche <= 3)) {
+	it('alle zwölf Skills haben einen Generator, der mit Standard- und Woche-6-Parametern läuft', () => {
+		for (const s of KATALOG) {
 			expect(s.generator, s.id).not.toBeNull();
-			expect(s.generator!.generate(s.params_default, 42).skillId).toBe(s.id);
+			for (const params of [s.params_default, ...(s.params_woche6 ?? [])]) {
+				for (let seed = 1; seed <= 50; seed++) {
+					const item = s.generator!.generate(params, seed);
+					expect(item.skillId).toBe(s.id);
+					expect(s.generator!.bewerte(item, item.loesung).correct).toBe(true);
+				}
+			}
 		}
+	});
+
+	it('Woche 6 erweitert genau Bündel zählen, Zahlenstrahl und Vergleichen um Dezimalzahlen', () => {
+		expect(KATALOG.filter((s) => s.params_woche6).map((s) => s.id)).toEqual([
+			'buendel_zaehlen',
+			'zahlenstrahl',
+			'zahlen_vergleichen'
+		]);
 	});
 });

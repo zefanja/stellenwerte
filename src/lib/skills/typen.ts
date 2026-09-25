@@ -18,11 +18,37 @@ export type Darstellung =
 	/** Material vor einer Wegnahme: „42 − 7, was musst du tauschen?“ */
 	| { typ: 'wegnahme'; zahl: number; abzug: number; material: Material }
 	/** „Wie viele Zehner stecken in 340?“ */
-	| { typ: 'buendel'; zahl: number; stelle: Stelle }
+	| { typ: 'buendel'; zahl: number; stelle: Exclude<StellenName, 'E' | 'ZT' | 't'> }
 	/** „34 Zehner sind welche Zahl?“ */
-	| { typ: 'buendel_umkehr'; anzahl: number; stelle: Stelle };
+	| { typ: 'buendel_umkehr'; anzahl: number; stelle: Stelle }
+	/** „4 090 + 10“ */
+	| { typ: 'rechnung'; zahl: number; op: Operation; schritt: number }
+	/** Kette von `start` bis `ziel` in gleichen Schritten; `laenge` Lücken dazwischen */
+	| { typ: 'kette'; start: number; ziel: number; op: Operation; schritt: number; laenge: number }
+	/** Leerer Zahlenstrahl von `von` bis `bis`; `raster` ist die Schrittweite des Reglers */
+	| {
+			typ: 'strahl';
+			von: number;
+			bis: number;
+			modus: 'verorten' | 'ablesen';
+			zahl: number;
+			raster: number;
+	  }
+	/** Zwei Zahlen vergleichen; `stellen` sind die angebotenen Begründungen (2–4) */
+	| { typ: 'vergleich'; zahlen: [number, number]; stellen: StellenName[] };
 
-export type Antwort = { typ: 'zahl'; wert: number } | { typ: 'material'; material: Material };
+export type Operation = '+' | '−';
+
+/** Stellen einschließlich Dezimalstellen: Zehntausender … Einer, Zehntel, Hundertstel, Tausendstel */
+export type StellenName = 'ZT' | 'T' | 'H' | 'Z' | 'E' | 'z' | 'h' | 't';
+
+export type Antwort =
+	| { typ: 'zahl'; wert: number }
+	| { typ: 'material'; material: Material }
+	/** Werte der Lücken einer Rechenkette, in Reihenfolge */
+	| { typ: 'kette'; werte: number[] }
+	/** Index der größeren Zahl und die Stelle, an der es sich entscheidet */
+	| { typ: 'vergleich'; groessere: 0 | 1; stelle: StellenName };
 
 export type EingabeTyp =
 	| 'ziffernblock'

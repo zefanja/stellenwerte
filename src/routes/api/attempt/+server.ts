@@ -4,7 +4,8 @@ import { attempt } from '$lib/server/db/schema';
 import { auftragGueltig, eigeneSession } from '$lib/server/training';
 import { STELLEN } from '$lib/skills/material';
 import { SKILLS } from '$lib/skills/katalog';
-import type { Antwort, Material } from '$lib/skills/typen';
+import type { Antwort, Material, StellenName } from '$lib/skills/typen';
+import { EXPONENT } from '$lib/skills/stellen';
 import type { VersuchMeldung } from '$lib/training';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,6 +26,22 @@ function bereinigeAntwort(a: unknown): Antwort | null {
 			material[s] = n;
 		}
 		return { typ: 'material', material };
+	}
+	if (
+		o.typ === 'kette' &&
+		Array.isArray(o.werte) &&
+		o.werte.length <= 12 &&
+		o.werte.every((w) => typeof w === 'number' && Number.isFinite(w))
+	) {
+		return { typ: 'kette', werte: o.werte as number[] };
+	}
+	if (
+		o.typ === 'vergleich' &&
+		(o.groessere === 0 || o.groessere === 1) &&
+		typeof o.stelle === 'string' &&
+		o.stelle in EXPONENT
+	) {
+		return { typ: 'vergleich', groessere: o.groessere, stelle: o.stelle as StellenName };
 	}
 	return null;
 }

@@ -6,12 +6,33 @@ export const RICHTIG: Bewertung = { correct: true, error_tag: null };
 export const falsch = (error_tag: ErrorTag): Bewertung => ({ correct: false, error_tag });
 
 export function antwortWert(a: Antwort): number {
-	return a.typ === 'zahl' ? a.wert : wert(a.material);
+	switch (a.typ) {
+		case 'zahl':
+			return a.wert;
+		case 'material':
+			return wert(a.material);
+		case 'kette':
+			return a.werte.at(-1) ?? NaN;
+		case 'vergleich':
+			return a.groessere;
+	}
 }
+
+/** Gleichheit für Dezimalzahlen: Werte entstehen aus ganzen Zahlen, Abweichungen nur durch Rundung */
+export const gleich = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 
 /** Vergleichsschlüssel: gleiche Antworten, auch bei fehlenden Nullspalten, ergeben denselben Schlüssel. */
 export function antwortSchluessel(a: Antwort): string {
-	return a.typ === 'zahl' ? `z:${a.wert}` : `m:${STELLEN.map((s) => a.material[s] ?? 0).join(',')}`;
+	switch (a.typ) {
+		case 'zahl':
+			return `z:${a.wert}`;
+		case 'material':
+			return `m:${STELLEN.map((s) => a.material[s] ?? 0).join(',')}`;
+		case 'kette':
+			return `k:${a.werte.join(',')}`;
+		case 'vergleich':
+			return `v:${a.groessere}:${a.stelle}`;
+	}
 }
 
 export const zahl = (wert: number): Antwort => ({ typ: 'zahl', wert });
@@ -28,7 +49,7 @@ export function distraktorenNachWert(
 	const gesehen = new Set<number>([loesung]);
 	const result: Distraktor[] = [];
 	for (const [error_tag, w] of kandidaten) {
-		if (w === undefined || !Number.isSafeInteger(w) || w < 0 || gesehen.has(w)) continue;
+		if (w === undefined || !Number.isFinite(w) || w < 0 || gesehen.has(w)) continue;
 		gesehen.add(w);
 		result.push({ antwort: alsAntwort(w), error_tag });
 	}
@@ -47,11 +68,11 @@ export function bewerteNachWert(item: Item, antwort: Antwort): Bewertung {
 
 	const w = antwortWert(antwort);
 	const l = antwortWert(item.loesung);
-	if (w === l) return RICHTIG;
+	if (gleich(w, l)) return RICHTIG;
 
-	const d = item.distraktoren.find((d) => antwortWert(d.antwort) === w);
+	const d = item.distraktoren.find((d) => gleich(antwortWert(d.antwort), w));
 	if (d) return falsch(d.error_tag);
-	if (Math.abs(w - l) === 1) return falsch('zaehlfehler_eins');
+	if (Number.isInteger(l) && gleich(Math.abs(w - l), 1)) return falsch('zaehlfehler_eins');
 	if (item.error_tags.includes('zaehlfehler_stelle') && [10, 100, 1000].includes(Math.abs(w - l))) {
 		return falsch('zaehlfehler_stelle');
 	}

@@ -17,6 +17,8 @@ export const FEHLERTYPEN = {
 	kein_entbuendeln: 'tauscht nicht, obwohl an einer Stelle zu wenig da ist',
 	entbuendeln_unvollstaendig: 'tauscht zu wenig oder an der falschen Stelle',
 	wert_veraendert: 'verändert beim Tauschen den Wert der Zahl',
+	ungenau: 'schätzt die Lage am Zahlenstrahl nur ungefähr',
+	stelle_falsch_begruendet: 'wählt richtig, nennt aber die falsche entscheidende Stelle',
 	sonstiges: 'unbekanntes Fehlermuster'
 } as const;
 

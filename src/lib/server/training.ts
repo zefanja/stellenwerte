@@ -26,17 +26,24 @@ export function auftragGueltig(sessionId: string, a: Auftrag): boolean {
 	return typeof a.token === 'string' && signaturGueltig(tokenDaten(sessionId, a), a.token);
 }
 
-/** Plan in einzelne, signierte Aufträge mit frischen Seeds auflösen */
-export function auftraegeAus(sessionId: string, bloecke: readonly PlanBlock[]): Auftrag[] {
+/**
+ * Plan in einzelne, signierte Aufträge mit frischen Seeds auflösen. Ab Woche 6 kommt etwa jede
+ * zweite Aufgabe eines erweiterten Skills mit Dezimal-Parametern.
+ */
+export function auftraegeAus(
+	sessionId: string,
+	bloecke: readonly PlanBlock[],
+	bisWoche: number
+): Auftrag[] {
 	return bloecke.flatMap((b) =>
-		Array.from({ length: b.anzahl }, () =>
-			signiere(sessionId, {
-				skill_id: b.skillId,
-				block: b.art,
-				params: SKILLS.get(b.skillId)!.params_default,
-				seed: neuerSeed()
-			})
-		)
+		Array.from({ length: b.anzahl }, () => {
+			const skill = SKILLS.get(b.skillId)!;
+			const dezimal = bisWoche >= 6 && skill.params_woche6 && Math.random() < 0.5;
+			const params = dezimal
+				? skill.params_woche6![Math.floor(Math.random() * skill.params_woche6!.length)]
+				: skill.params_default;
+			return signiere(sessionId, { skill_id: b.skillId, block: b.art, params, seed: neuerSeed() });
+		})
 	);
 }
 

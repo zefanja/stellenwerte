@@ -1,14 +1,20 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SKILLS } from '../src/lib/skills/katalog';
 import { STELLEN, STELLENNAME, normiert } from '../src/lib/skills/material';
+import { STELLEN_NAME } from '../src/lib/skills/stellen';
+import { zahlText } from '../src/lib/skills/text';
 import type { Auftrag, SessionAntwort } from '../src/lib/training';
 import { anmelden, datenbank, tippeUnten } from './hilfen';
-import { SCHUELER } from './testdaten';
+import { SCHUELER, SCHUELER_WOCHE45 } from './testdaten';
 
 test.describe.configure({ mode: 'serial' });
 
 /** Löst eine Aufgabe richtig, ausschließlich über Bedienelemente der unteren Bildschirmhälfte. */
 async function loese(page: Page, auftrag: Auftrag) {
+	const tippeZahl = async (n: number) => {
+		for (const z of String(n)) await unten(z === '.' ? 'Komma' : z);
+		await unten('Bestätigen');
+	};
 	const skill = SKILLS.get(auftrag.skill_id)!;
 	const item = skill.generator!.generate(auftrag.params, auftrag.seed);
 	await expect(page.getByTestId('prompt')).toHaveText(item.prompt);
@@ -43,9 +49,23 @@ async function loese(page: Page, auftrag: Auftrag) {
 		for (const s of STELLEN)
 			for (let i = 0; i < (m[s] ?? 0); i++) await unten(`${STELLENNAME[s].einzahl} nehmen`);
 		await unten('Fertig');
+	} else if (item.loesung.typ === 'kette') {
+		for (const w of item.loesung.werte) await tippeZahl(w);
+	} else if (item.loesung.typ === 'vergleich' && item.darstellung.typ === 'vergleich') {
+		await unten(zahlText(item.darstellung.zahlen[item.loesung.groessere]));
+		await unten(`${item.loesung.stelle} ${STELLEN_NAME[item.loesung.stelle]}`);
+	} else if (item.darstellung.typ === 'strahl' && item.darstellung.modus === 'verorten') {
+		// auf den Strahl tippen, dort wo die Zahl liegt (Linie von x = 40 bis 960 im viewBox 0…1000)
+		const { von, bis, zahl } = item.darstellung;
+		const strahl = page.locator('.unten [data-testid="strahl"]');
+		const box = (await strahl.boundingBox())!;
+		expect(box.y).toBeGreaterThanOrEqual(page.viewportSize()!.height / 2);
+		const x = box.x + (box.width * (40 + ((zahl - von) / (bis - von)) * 920)) / 1000;
+		await page.touchscreen.tap(x, box.y + box.height / 2);
+		await expect(page.getByTestId('marke')).toBeVisible();
+		await unten('Fertig');
 	} else if (item.loesung.typ === 'zahl') {
-		for (const z of String(item.loesung.wert)) await unten(z);
-		await unten('Bestätigen');
+		await tippeZahl(item.loesung.wert);
 	}
 	await expect(page.getByTestId('richtig')).toBeVisible();
 	await expect(page.getByTestId('richtig')).toBeHidden();
@@ -168,4 +188,45 @@ test('der Server bewertet selbst und nimmt keine veränderten Aufträge an', asy
 	// anderer Seed oder andere Rolle mit altem Token: abgelehnt
 	expect((await melde({ ...auftrag, seed: auftrag.seed + 1 }, item.loesung)).status()).toBe(400);
 	expect((await melde({ ...auftrag, block: 'wiederholung' }, item.loesung)).status()).toBe(400);
+});
+
+test('Wochen 4 bis 6: Stelle verändern, Rechenkette, Zahlenstrahl, Vergleichen, einhändig lösbar', async ({
+	page
+}) => {
+	const res = await page.request.post('/api/login', {
+		data: { code: SCHUELER_WOCHE45.code, bestaetigt: true }
+	});
+	expect(res.ok()).toBe(true);
+	const erste = await sessionAntwort(page, () => page.goto('/ueben'));
+	const alle = [erste];
+	for (const a of erste.auftraege) await loese(page, a);
+	// zwei Verlängerungen holen die übrigen fälligen Skills
+	for (let i = 0; i < 2; i++) {
+		const mehr = await sessionAntwort(page, () =>
+			tippeUnten(page, page.getByRole('button', { name: 'Noch 5 Aufgaben' }))
+		);
+		alle.push(mehr);
+		for (const a of mehr.auftraege) await loese(page, a);
+	}
+	await tippeUnten(page, page.getByRole('button', { name: 'Fertig' }));
+	await expect(page).toHaveURL('/');
+
+	const geuebt = new Set(
+		alle.flatMap((s) =>
+			s.auftraege.filter((a) => a.block === 'wiederholung').map((a) => a.skill_id)
+		)
+	);
+	expect([...geuebt].sort()).toEqual([...SCHUELER_WOCHE45.faellig].sort());
+
+	const sql = datenbank();
+	const karten =
+		await sql`select skill_id, reps, again_in_folge from card join student on student.id = card.student_id
+		where student.label = ${SCHUELER_WOCHE45.label} and skill_id in ${sql(SCHUELER_WOCHE45.faellig)}`;
+	const falsch =
+		await sql`select count(*)::int as n from attempt join student on student.id = attempt.student_id
+		where student.label = ${SCHUELER_WOCHE45.label} and not correct`;
+	await sql.end();
+	// alle vier Wiederholungen bewertet, alles beim ersten Versuch richtig
+	expect(karten.map((k) => k.reps)).toEqual([4, 4, 4, 4]);
+	expect(falsch[0].n).toBe(0);
 });

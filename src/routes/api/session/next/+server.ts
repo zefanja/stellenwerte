@@ -39,7 +39,7 @@ export async function GET({ locals, url }) {
 		});
 		return json({
 			session_id: session.id,
-			auftraege: auftraegeAus(session.id, bloecke)
+			auftraege: auftraegeAus(session.id, bloecke, bisWoche)
 		} satisfies SessionAntwort);
 	}
 
@@ -58,6 +58,6 @@ export async function GET({ locals, url }) {
 		.returning({ id: trainingSession.id });
 	return json({
 		session_id: session.id,
-		auftraege: auftraegeAus(session.id, plan.bloecke)
+		auftraege: auftraegeAus(session.id, plan.bloecke, bisWoche)
 	} satisfies SessionAntwort);
 }

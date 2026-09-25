@@ -1,5 +1,11 @@
 /** Feste Testdaten, von seed.ts angelegt und in den Tests verwendet */
 export const SCHUELER = { label: 'Testkind 01', code: '314159' };
+/** Hat alle Skills der Wochen 4–5 fällig (älteste zuerst), dazu einen stabilen Skill zum Aufwärmen */
+export const SCHUELER_WOCHE45 = {
+	label: 'Testkind 02',
+	code: '271828',
+	faellig: ['stelle_veraendern', 'rechenkette', 'zahlenstrahl', 'zahlen_vergleichen']
+};
 export const LEHRKRAFT = { email: 'e2e@schule.test', password: 'e2e-passwort-123' };
 
 /**

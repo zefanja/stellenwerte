@@ -7,6 +7,10 @@ import { zahlwort_ziffern } from './generatoren/zahlwort_ziffern';
 import { nicht_normiert } from './generatoren/nicht_normiert';
 import { buendel_zaehlen } from './generatoren/buendel_zaehlen';
 import { buendel_umkehr } from './generatoren/buendel_umkehr';
+import { stelle_veraendern } from './generatoren/stelle_veraendern';
+import { rechenkette } from './generatoren/rechenkette';
+import { zahlenstrahl } from './generatoren/zahlenstrahl';
+import { zahlen_vergleichen } from './generatoren/zahlen_vergleichen';
 
 export interface SkillDef {
 	/** stabil, FSRS-Karten hängen daran */
@@ -14,10 +18,15 @@ export interface SkillDef {
 	titel: string;
 	woche: 1 | 2 | 3 | 4 | 5 | 6;
 	beschreibung: string;
-	/** null: Generator folgt in einem späteren Meilenstein, Skill wird nicht freigeschaltet */
+	/** null: kein Generator, Skill wird nicht freigeschaltet */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	generator: Generator<any> | null;
 	params_default: unknown;
+	/**
+	 * Woche 6 (Größen und Dezimalzahlen) ist kein eigener Skill, sondern eine Parametererweiterung:
+	 * Ist die Gruppe bis Woche 6 freigegeben, kommt etwa jede zweite Aufgabe aus dieser Liste.
+	 */
+	params_woche6?: unknown[];
 	voraussetzungen: string[];
 	eingabe_typ: EingabeTyp;
 	/** Zielwert der Median-Antwortzeit für die FSRS-Bewertung (Easy darunter, Hard über dem Doppelten) */
@@ -96,6 +105,10 @@ export const KATALOG: readonly SkillDef[] = [
 		woche: 3,
 		beschreibung: '„Wie viele Zehner stecken in 340?“',
 		generator: buendel_zaehlen,
+		params_woche6: [
+			{ zielstelle: 'z', zahlenraum: [1, 99.9] },
+			{ zielstelle: 'h', zahlenraum: [0.1, 9.99] }
+		],
 		voraussetzungen: ['material_zu_zahl', 'tauschen_entbuendeln'],
 		eingabe_typ: 'ziffernblock',
 		zielzeit_ms: 10_000
@@ -115,7 +128,7 @@ export const KATALOG: readonly SkillDef[] = [
 		titel: 'Stelle verändern',
 		woche: 4,
 		beschreibung: '4 090 + 10, 1 000 − 1',
-		generator: null,
+		generator: stelle_veraendern,
 		voraussetzungen: ['nicht_normiert', 'zahl_zu_material'],
 		eingabe_typ: 'ziffernblock',
 		zielzeit_ms: 10_000
@@ -125,7 +138,7 @@ export const KATALOG: readonly SkillDef[] = [
 		titel: 'Rechenkette',
 		woche: 4,
 		beschreibung: 'Kette in gleichen Schritten bis zur Zielzahl',
-		generator: null,
+		generator: rechenkette,
 		voraussetzungen: ['stelle_veraendern'],
 		eingabe_typ: 'ziffernblock_kette',
 		zielzeit_ms: 30_000
@@ -135,7 +148,20 @@ export const KATALOG: readonly SkillDef[] = [
 		titel: 'Zahlenstrahl',
 		woche: 5,
 		beschreibung: 'Zahl auf leerem Strahl verorten, und umgekehrt',
-		generator: null,
+		generator: zahlenstrahl,
+		params_woche6: [
+			{
+				intervalle: [
+					[0, 1],
+					[0, 10],
+					[2, 3]
+				],
+				toleranz_prozent: 5,
+				modus: 'zufall',
+				nachkommastellen: 1
+			},
+			{ intervalle: [[0, 1]], toleranz_prozent: 5, modus: 'zufall', nachkommastellen: 2 }
+		],
 		voraussetzungen: ['zahlwort_ziffern', 'buendel_zaehlen'],
 		eingabe_typ: 'strahl_regler',
 		zielzeit_ms: 12_000
@@ -145,7 +171,8 @@ export const KATALOG: readonly SkillDef[] = [
 		titel: 'Zahlen vergleichen',
 		woche: 5,
 		beschreibung: 'Größere Zahl wählen, Stelle begründen',
-		generator: null,
+		generator: zahlen_vergleichen,
+		params_woche6: [{ stellen: [1, 2], gleiche_ziffern: false, nachkommastellen: [1, 2] }],
 		voraussetzungen: ['material_zu_zahl', 'zahlwort_ziffern'],
 		eingabe_typ: 'auswahlkarten',
 		zielzeit_ms: 8_000

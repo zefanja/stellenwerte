@@ -11,10 +11,19 @@
 		/** Bestätigen erst möglich, wenn true; Standard: sobald etwas eingegeben ist */
 		bereit?: boolean;
 		gesperrt?: boolean;
+		/** Kommataste für Dezimalzahlen (Woche 6); Bestätigen rückt dann in eine eigene Zeile */
+		komma?: boolean;
 		onbestaetigen: () => void;
 	}
 
-	let { wert = $bindable(), maxLaenge, bereit, gesperrt = false, onbestaetigen }: Props = $props();
+	let {
+		wert = $bindable(),
+		maxLaenge,
+		bereit,
+		gesperrt = false,
+		komma = false,
+		onbestaetigen
+	}: Props = $props();
 	const kannBestaetigen = $derived(bereit ?? wert.length > 0);
 
 	// Bis der Block interaktiv ist, bleibt er gesperrt: Auf langsamen Handys gingen Tipps vor
@@ -25,6 +34,12 @@
 
 	function tippe(ziffer: string) {
 		if (!aus && wert.length < maxLaenge) wert += ziffer;
+	}
+
+	/** Höchstens ein Komma; vorne ergänzt „0,“ */
+	function tippeKomma() {
+		if (aus || wert.includes(',') || wert.length >= maxLaenge) return;
+		wert = (wert || '0') + ',';
 	}
 
 	function loesche() {
@@ -38,6 +53,7 @@
 	// Physische Tastatur nur als Komfort am Rechner; es gibt kein Eingabefeld.
 	function onkeydown(e: KeyboardEvent) {
 		if (/^\d$/.test(e.key)) tippe(e.key);
+		else if (komma && (e.key === ',' || e.key === '.')) tippeKomma();
 		else if (e.key === 'Backspace') loesche();
 		else if (e.key === 'Enter') bestaetige();
 		else return;
@@ -72,9 +88,14 @@
 		</svg>
 	</button>
 	<button type="button" class="taste" disabled={aus} onclick={() => tippe('0')}>0</button>
+	{#if komma}
+		<button type="button" class="taste" disabled={aus} onclick={tippeKomma} aria-label="Komma"
+			>,</button
+		>
+	{/if}
 	<button
 		type="button"
-		class="taste taste-ok"
+		class="taste taste-ok {komma ? 'col-span-3' : ''}"
 		disabled={aus || !kannBestaetigen}
 		onclick={bestaetige}
 		aria-label="Bestätigen"

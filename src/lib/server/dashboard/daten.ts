@@ -203,7 +203,7 @@ export async function schuelerProfil(studentId: string, jetzt: Date) {
 				zeit: a.createdAt,
 				skill: skill?.titel ?? a.skillId,
 				aufgabe: item ? aufgabeText(item) : '–',
-				antwort: antwortText(a.answerJson as Antwort),
+				antwort: antwortText(a.answerJson as Antwort, item),
 				loesung: item ? antwortText(item.loesung) : '–',
 				fehler: fehlerText(a.errorTag),
 				zweiterVersuch: a.hintUsed
