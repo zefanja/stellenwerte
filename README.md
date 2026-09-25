@@ -10,7 +10,8 @@ Web-App für tägliche 5-Minuten-Übungen zum Stellenwertverständnis (Klasse 5�
 | 2   | Schüler-Login mit Ziffernblock, Cookie, „Bist du das?“    | fertig, Playwright-Test im Handy-Format; Prüfung auf echtem Handy offen |
 | 3   | Generatoren und Fehlertypen Wochen 1–3 mit Tests          | fertig, 8 Generatoren, je 200 Items pro Parametersatz geprüft           |
 | 4   | Eingabekomponenten, SVG-Material, Animationen, Session-Flow | fertig, Playwright löst 10+5 Aufgaben nur mit Tipps in der unteren Hälfte; Prüfung auf echtem Handy offen |
-| 5–8 | FSRS, Dashboard, PDF, PWA                                 | offen                                                                   |
+| 5   | FSRS, Einführungsmodus, Freischaltung, Sessionaufbau      | fertig, 30-Tage-Simulation mit vier Schülerprofilen als Test            |
+| 6–8 | Dashboard, PDF, PWA                                       | offen                                                                   |
 
 ## Entwicklung
 
@@ -39,6 +40,11 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test`
   - `fehler.ts`: alle `error_tag`s mit Klartext fürs Dashboard
 - `src/lib/material/`: SVG-Material, Layout der Stellenwerttafel (`layout.ts`, getestet), animiertes Modell mit Bündeln, Entbündeln, Legen und „Material zu Zahl“ (`modell.svelte.ts`), Gesten
 - `src/lib/aufgaben/`: eine Komponente je Eingabetyp, jeweils mit Versuch, Hilfe (zweiter Versuch mit Material) und Lösungsanimation
+- `src/lib/server/planung/`: reine Funktionen ohne Datenbank, alle getestet
+  - `zeit.ts`: Kalendertage in Europe/Berlin (auch an Tagen der Zeitumstellung)
+  - `fsrs.ts`: Bewertung einer Runde aus fünf Aufgaben, FSRS-Update über `ts-fsrs`
+  - `sessionplan.ts`: Sessionaufbau, Freischaltung, Verlängerung
+  - `simulation.ts`: simulierter Schüler; `simulation.test.ts` ist die Abnahme von M5
 - `src/routes/ueben/`: Session-Ablauf; `src/routes/api/session/*`, `api/attempt`: signierte Aufträge, serverseitige Bewertung
 - `src/lib/server/auth/`: Codes (Argon2id-Hash plus HMAC-Kurzindex), signierte Cookies, Rate Limit
 - `src/routes/lehrer/`: Lehrer-Oberfläche
@@ -61,6 +67,11 @@ Tests: `npx vitest run` (Generatoren, Layout, Rate Limit), `npx playwright test`
 - **Verlängerung:** Nach 10 Aufgaben „Noch 5 Aufgaben“, höchstens dreimal (`MAX_VERLAENGERUNGEN`), in derselben Session.
 - **Bewegung an/aus** auf der Startseite, gespeichert auf dem Gerät; Standard folgt `prefers-reduced-motion`.
 - **Noch nicht in M4:** `StrahlRegler` und `Auswahlkarten` kommen mit den Generatoren der Woche 5, die Stellenwechsel-Animation (399 + 1) mit `stelle_veraendern` (Woche 4), jeweils in M8. Antworten ohne Netz werden bisher nur im Speicher wiederholt; die Ablage auf dem Gerät folgt mit dem Offline-Puffer (M8).
+- **FSRS tagesgenau:** `ts-fsrs` ohne Kurzzeitschritte und ohne Zufallsstreuung, `request_retention` 0,9, `maximum_interval` 120. Fällig ist eine Karte ab Mitternacht (Berlin) ihres Tages; nach Again immer am Folgetag (ts-fsrs selbst würde teils zwei Tage geben).
+- **Einführung:** Beim ersten Einplanen eines neuen Skills entsteht seine Karte mit `state = 0` und `introduced_at`. Die Prüfrunde macht daraus erst ab Hard eine FSRS-Karte; sonst bleibt der Skill im Einführungsmodus und kommt am nächsten Tag wieder. Es läuft höchstens eine Einführung zur Zeit.
+- **Sessionaufbau:** Aufwärmen 2 Aufgaben, bei zwei fälligen Karten nur 1, damit es bei höchstens 12 Aufgaben bleibt. Der Einführungsblock (3 begleitete + 5 Prüfung, dazu 2 Beispiele zum Zuschauen) kommt nur, wenn er noch passt, also praktisch nur an Tagen ohne fällige Karte. Unter 8 Aufgaben wird mit freiem Üben aufgefüllt (ohne FSRS-Wirkung).
+- **Bewertung am Sessionende**, in einer Transaktion und idempotent. Liegengebliebene Sessions (App geschlossen) werden vor der nächsten Session abgeschlossen; unvollständige Runden bleiben ohne Wirkung, die Karte bleibt fällig.
+- **Verlängerung:** nächste fällige Karte, die heute noch nicht dran war; sonst freies Üben.
 - **Lehrer-Oberfläche nutzt SvelteKit-Form-Actions** statt `/api/teacher/*`. Die JSON-Endpunkte kommen dazu, wenn sie gebraucht werden (Exporte).
 - **Zusätzliche Fehlertypen** über die Beispieltabelle hinaus, z. B. `nullstelle_fehlt`, `verkettet` (300 und 5 → 3005), `gerundet`, `kein_entbuendeln`. Liste in `fehler.ts`.
 - **`tauschen_entbuendeln`:** Die Antwort ist der Materialzustand nach dem Tauschen. Richtig ist jeder wertgleiche Zustand, in dem jede Spalte für die Wegnahme reicht. Mehr zu tauschen als nötig gilt nicht als Fehler.

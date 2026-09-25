@@ -44,6 +44,7 @@ export async function POST({ locals, request }) {
 	if (!session) error(404, 'Session nicht gefunden');
 	if (!auftragGueltig(session.id, body.auftrag)) error(400, 'Auftrag ungültig');
 
+	if (body.auftrag.block === 'beispiel') error(400, 'Beispiele werden nicht beantwortet');
 	const skill = SKILLS.get(body.auftrag.skill_id);
 	if (!skill?.generator) error(400, 'Skill unbekannt');
 	const antwort = bereinigeAntwort(body.answer);
@@ -61,6 +62,7 @@ export async function POST({ locals, request }) {
 			skillId: skill.id,
 			sessionId: session.id,
 			seed: body.auftrag.seed,
+			block: body.auftrag.block,
 			paramsJson: body.auftrag.params,
 			answerJson: antwort,
 			correct: bewertung.correct,

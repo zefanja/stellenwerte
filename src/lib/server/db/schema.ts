@@ -105,6 +105,8 @@ export const attempt = pgTable(
 		skillId: text('skill_id').notNull(),
 		sessionId: uuid('session_id').references(() => trainingSession.id, { onDelete: 'cascade' }),
 		seed: integer('seed').notNull(),
+		/** Rolle in der Session (BlockArt); nur 'wiederholung' und 'pruefung' gehen in FSRS ein */
+		block: text('block'),
 		paramsJson: jsonb('params_json').notNull(),
 		answerJson: jsonb('answer_json').notNull(),
 		correct: boolean('correct').notNull(),

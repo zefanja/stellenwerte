@@ -14,6 +14,14 @@ async function loese(page: Page, auftrag: Auftrag) {
 	const unten = (name: string, exact = true) =>
 		tippeUnten(page, page.getByRole('button', { name, exact }));
 
+	if (auftrag.block === 'beispiel') {
+		// „Schau zu“: die Lösung läuft als Animation, danach nur Weiter
+		await expect(page.getByTestId('schau-zu')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Weiter' })).toBeEnabled({ timeout: 15_000 });
+		await unten('Weiter');
+		return;
+	}
+
 	if (
 		skill.eingabe_typ === 'material_tauschen' &&
 		item.darstellung.typ === 'wegnahme' &&
@@ -50,7 +58,7 @@ async function sessionAntwort(page: Page, aktion: () => Promise<unknown>): Promi
 	return res.json();
 }
 
-test('eine Session mit 10 Aufgaben plus Verlängerung ist einhändig im Hochformat lösbar', async ({
+test('erste Session: Einführung einhändig lösbar, Verlängerung, danach FSRS-Karte', async ({
 	page
 }) => {
 	await anmelden(page);
@@ -58,7 +66,13 @@ test('eine Session mit 10 Aufgaben plus Verlängerung ist einhändig im Hochform
 	const erste = await sessionAntwort(page, () =>
 		tippeUnten(page, page.getByRole('link', { name: "Los geht's" }))
 	);
-	expect(erste.auftraege).toHaveLength(10);
+	// neuer Schüler: zwei Beispiele, drei begleitete Aufgaben, Prüfrunde aus fünf
+	expect(erste.auftraege.map((a) => a.block)).toEqual([
+		...Array(2).fill('beispiel'),
+		...Array(3).fill('gefuehrt'),
+		...Array(5).fill('pruefung')
+	]);
+	expect(new Set(erste.auftraege.map((a) => a.skill_id))).toEqual(new Set(['buendeln_100']));
 	for (const a of erste.auftraege) await loese(page, a);
 
 	await expect(page.getByText('Geschafft!')).toBeVisible();
@@ -75,13 +89,22 @@ test('eine Session mit 10 Aufgaben plus Verlängerung ist einhändig im Hochform
 	const [s] =
 		await sql`select finished_at, item_count, correct_count from session where id = ${erste.session_id}`;
 	const versuche =
-		await sql`select correct, hint_used from attempt where session_id = ${erste.session_id}`;
+		await sql`select correct, hint_used, block from attempt where session_id = ${erste.session_id}`;
+	const [karte] = await sql`select state, reps, introduced_at,
+		(due at time zone 'Europe/Berlin')::date - (now() at time zone 'Europe/Berlin')::date as tage
+		from card where skill_id = 'buendeln_100'`;
 	await sql.end();
+	// 3 begleitete + 5 Prüfung + 5 Verlängerung; Beispiele werden nicht beantwortet
 	expect(s.finished_at).not.toBeNull();
-	expect(s.item_count).toBe(15);
-	expect(s.correct_count).toBe(15);
-	expect(versuche).toHaveLength(15);
+	expect(s.item_count).toBe(13);
+	expect(s.correct_count).toBe(13);
+	expect(versuche.filter((v) => v.block === 'pruefung')).toHaveLength(5);
 	expect(versuche.every((v) => v.correct && !v.hint_used)).toBe(true);
+	// Prüfrunde fehlerfrei und schneller als die Zielzeit: Easy, aus der Einführung wird eine Review-Karte
+	expect(karte.state).toBe(2);
+	expect(karte.reps).toBe(1);
+	expect(karte.introduced_at).not.toBeNull();
+	expect(karte.tage).toBe(8);
 });
 
 test('zweimal falsch: Wiederholung mit Material, dann Lösung als Animation und weiter', async ({
@@ -89,6 +112,12 @@ test('zweimal falsch: Wiederholung mit Material, dann Lösung als Animation und 
 }) => {
 	await anmelden(page);
 	const s = await sessionAntwort(page, () => page.goto('/ueben'));
+	// heute schon eingeführt und nichts fällig: Aufwärmen, freies Üben, Abschluss
+	expect([...new Set(s.auftraege.map((a) => a.block))]).toEqual([
+		'aufwaermen',
+		'uebung',
+		'abschluss'
+	]);
 	const falsch = async () => {
 		const fertig = page.getByRole('button', { name: 'Fertig' });
 		if (await fertig.count()) return tippeUnten(page, fertig);
@@ -115,7 +144,7 @@ test('zweimal falsch: Wiederholung mit Material, dann Lösung als Animation und 
 	expect(versuche.every((v) => typeof v.error_tag === 'string')).toBe(true);
 });
 
-test('der Server bewertet selbst und nimmt keine fremden Aufträge an', async ({ page }) => {
+test('der Server bewertet selbst und nimmt keine veränderten Aufträge an', async ({ page }) => {
 	await anmelden(page);
 	const s: SessionAntwort = await (await page.request.get('/api/session/next')).json();
 	const auftrag = s.auftraege[0];
@@ -134,6 +163,7 @@ test('der Server bewertet selbst und nimmt keine fremden Aufträge an', async ({
 
 	const richtig = await melde(auftrag, item.loesung);
 	expect(await richtig.json()).toEqual({ correct: true, error_tag: null });
-	// anderer Seed mit altem Token: abgelehnt
+	// anderer Seed oder andere Rolle mit altem Token: abgelehnt
 	expect((await melde({ ...auftrag, seed: auftrag.seed + 1 }, item.loesung)).status()).toBe(400);
+	expect((await melde({ ...auftrag, block: 'wiederholung' }, item.loesung)).status()).toBe(400);
 });

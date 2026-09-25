@@ -1,8 +1,16 @@
 import type { Antwort } from '$lib/skills/typen';
 
+/**
+ * Rolle einer Aufgabe in der Session. Nur `wiederholung` und `pruefung` fließen in FSRS ein;
+ * `beispiel` wird nur gezeigt, `gefuehrt` beginnt gleich mit Material.
+ */
+export type BlockArt =
+	'aufwaermen' | 'wiederholung' | 'beispiel' | 'gefuehrt' | 'pruefung' | 'uebung' | 'abschluss';
+
 /** Aufgabenauftrag vom Server: der Client generiert das Item daraus selbst. */
 export interface Auftrag {
 	skill_id: string;
+	block: BlockArt;
 	params: unknown;
 	seed: number;
 	/** HMAC über Session, Skill, Seed und Parameter; der Server nimmt nur eigene Aufträge an */

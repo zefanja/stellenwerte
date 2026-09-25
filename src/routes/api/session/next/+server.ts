@@ -1,35 +1,63 @@
 import { error, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { trainingSession } from '$lib/server/db/schema';
-import { eigeneSession, freigegebeneWoche, waehleAuftraege } from '$lib/server/training';
-import { SESSION_LAENGE, VERLAENGERUNG, type SessionAntwort } from '$lib/training';
+import { planeSession, planeVerlaengerung } from '$lib/server/planung/sessionplan';
+import {
+	auftraegeAus,
+	beginneEinfuehrung,
+	eigeneSession,
+	freigegebeneWoche,
+	ladeKarten,
+	schliesseOffeneAb,
+	schonWiederholt
+} from '$lib/server/training';
+import { KATALOG } from '$lib/skills/katalog';
+import { Rng, neuerSeed } from '$lib/skills/rng';
+import type { SessionAntwort } from '$lib/training';
 
 /**
- * Ohne Parameter: neue Session mit zehn Aufträgen.
- * Mit `?session=<id>`: freiwillige Verlängerung derselben Session um fünf Aufträge.
+ * Ohne Parameter: neue Session nach FSRS-Plan (Aufwärmen, fällige Karten, Einführung, Abschluss).
+ * Mit `?session=<id>`: freiwillige Verlängerung derselben Session um fünf Aufgaben.
  */
 export async function GET({ locals, url }) {
 	const s = locals.student!;
-	const woche = await freigegebeneWoche(s.id);
+	const jetzt = new Date();
+	const bisWoche = await freigegebeneWoche(s.id);
+	const zufall = new Rng(neuerSeed());
 	const bestehend = url.searchParams.get('session');
 
 	if (bestehend) {
 		const session = await eigeneSession(s.id, bestehend);
 		if (!session) error(404, 'Session nicht gefunden');
-		const antwort: SessionAntwort = {
+		const bloecke = planeVerlaengerung({
+			karten: await ladeKarten(s.id),
+			jetzt,
+			bisWoche,
+			katalog: KATALOG,
+			zufall,
+			schonWiederholt: await schonWiederholt(session.id)
+		});
+		return json({
 			session_id: session.id,
-			auftraege: waehleAuftraege(session.id, VERLAENGERUNG, woche)
-		};
-		return json(antwort);
+			auftraege: auftraegeAus(session.id, bloecke)
+		} satisfies SessionAntwort);
 	}
 
+	await schliesseOffeneAb(s.id);
+	const plan = planeSession({
+		karten: await ladeKarten(s.id),
+		jetzt,
+		bisWoche,
+		katalog: KATALOG,
+		zufall
+	});
+	if (plan.einzufuehren) await beginneEinfuehrung(s.id, plan.einzufuehren, jetzt);
 	const [session] = await db
 		.insert(trainingSession)
 		.values({ studentId: s.id })
 		.returning({ id: trainingSession.id });
-	const antwort: SessionAntwort = {
+	return json({
 		session_id: session.id,
-		auftraege: waehleAuftraege(session.id, SESSION_LAENGE, woche)
-	};
-	return json(antwort);
+		auftraege: auftraegeAus(session.id, plan.bloecke)
+	} satisfies SessionAntwort);
 }

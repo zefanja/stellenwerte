@@ -10,7 +10,7 @@
 	import type { Antwort, Item } from '$lib/skills/typen';
 	import { MAX_VERLAENGERUNGEN, type Auftrag, type SessionAntwort } from '$lib/training';
 
-	type Phase = 'laden' | 'aufgabe' | 'richtig' | 'ende' | 'fehler';
+	type Phase = 'laden' | 'aufgabe' | 'richtig' | 'ende' | 'leer' | 'fehler';
 
 	let sessionId = '';
 	let auftraege = $state<Auftrag[]>([]);
@@ -19,7 +19,8 @@
 	let modus = $state<Modus>('versuch');
 	let phase = $state<Phase>('laden');
 	let verlaengerungen = $state(0);
-	let ergebnisse = $state<boolean[]>([]);
+	/** true richtig, false nicht gelöst, null nur angeschaut (Beispiel) */
+	let ergebnisse = $state<(boolean | null)[]>([]);
 	let startZeit = 0;
 	const postausgang = new Postausgang();
 
@@ -41,17 +42,25 @@
 			const s = await lade('/api/session/next');
 			sessionId = s.session_id;
 			auftraege = s.auftraege;
-			starteAufgabe();
+			if (auftraege.length === 0) phase = 'leer';
+			else starteAufgabe();
 		} catch {
 			phase = 'fehler';
 		}
 	});
 
+	/** Beispiele laufen als Lösungsanimation („Schau zu“), begleitete Aufgaben beginnen mit Material. */
 	function starteAufgabe() {
+		const block = auftraege[index].block;
 		phase = 'aufgabe';
 		versuch = 1;
-		modus = 'versuch';
+		modus = block === 'beispiel' ? 'loesung' : block === 'gefuehrt' ? 'hilfe' : 'versuch';
 		startZeit = performance.now();
+	}
+
+	function nachAufgabe() {
+		if (auftraege[index].block === 'beispiel') ergebnisse[index] = null;
+		weiter();
 	}
 
 	function beantworte(antwort: Antwort) {
@@ -94,6 +103,10 @@
 		try {
 			const s = await lade(`/api/session/next?session=${sessionId}`);
 			verlaengerungen++;
+			if (s.auftraege.length === 0) {
+				phase = 'ende';
+				return;
+			}
 			auftraege = [...auftraege, ...s.auftraege];
 			index++;
 			starteAufgabe();
@@ -132,7 +145,9 @@
 					class="h-2.5 w-2.5 rounded-full {i < index || (i === index && phase === 'ende')
 						? ergebnisse[i]
 							? 'bg-emerald-500'
-							: 'bg-slate-400'
+							: ergebnisse[i] === null
+								? 'bg-sky-300'
+								: 'bg-slate-400'
 						: i === index
 							? 'bg-slate-800'
 							: 'bg-slate-300'}"
@@ -154,6 +169,17 @@
 					onclick={() => location.reload()}>Noch mal</button
 				>
 			</div>
+		{:else if phase === 'leer'}
+			<div class="flex h-full flex-col">
+				<p class="flex flex-1 items-center justify-center text-center text-2xl">
+					Für heute ist alles geschafft.
+				</p>
+				<button
+					type="button"
+					class="min-h-20 rounded-2xl bg-emerald-600 text-2xl font-semibold text-white shadow"
+					onclick={beenden}>Fertig</button
+				>
+			</div>
 		{:else if phase === 'ende'}
 			<div class="flex h-full flex-col">
 				<section class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
@@ -172,7 +198,9 @@
 						/>
 					</svg>
 					<p class="text-3xl font-bold">Geschafft!</p>
-					<p class="text-xl text-slate-600">{auftraege.length} Aufgaben</p>
+					<p class="text-xl text-slate-600">
+						{ergebnisse.filter((e) => e !== null).length} Aufgaben
+					</p>
 				</section>
 				<div class="flex flex-col gap-3">
 					{#if verlaengerungen < MAX_VERLAENGERUNGEN}
@@ -191,7 +219,15 @@
 			</div>
 		{:else if item}
 			{#key `${index}:${versuch}`}
-				<Aufgabe {item} {modus} onantwort={beantworte} onweiter={weiter} />
+				{#if auftraege[index].block === 'beispiel'}
+					<p
+						class="absolute -top-1 right-0 z-10 rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold text-sky-800"
+						data-testid="schau-zu"
+					>
+						Schau zu
+					</p>
+				{/if}
+				<Aufgabe {item} {modus} onantwort={beantworte} onweiter={nachAufgabe} />
 			{/key}
 			{#if phase === 'richtig'}
 				<!-- kurzes visuelles Signal ohne Ton -->
