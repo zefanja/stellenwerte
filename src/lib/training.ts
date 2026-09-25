@@ -30,6 +30,8 @@ export interface VersuchMeldung {
 	duration_ms: number;
 	/** zweiter Versuch, nachdem die Aufgabe mit Material wiederholt wurde */
 	hint_used: boolean;
+	/** Zeitpunkt der Antwort auf dem Gerät (ms), damit offline Geübtes den richtigen Tag bekommt */
+	zeitpunkt?: number;
 }
 
 export const SESSION_LAENGE = 10;

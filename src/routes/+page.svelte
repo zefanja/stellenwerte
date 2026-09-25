@@ -3,11 +3,24 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { einstellungen, ladeEinstellungen, setzeAnimationen } from '$lib/einstellungen.svelte';
+	import { postausgang } from '$lib/postausgang';
+	import { loescheSitzung } from '$lib/sitzung';
 	let { data } = $props();
 
-	onMount(ladeEinstellungen);
+	/** Antworten, die noch auf dem Gerät warten (offline geübt) */
+	let offen = $state(0);
+
+	onMount(() => {
+		ladeEinstellungen();
+		offen = postausgang.anzahl;
+		postausgang.leeren().then(() => (offen = postausgang.anzahl));
+	});
 
 	async function abmelden() {
+		// erst senden, was noch wartet; danach gehört das Gerät dem nächsten Kind
+		await postausgang.leeren(5000);
+		loescheSitzung();
+		await caches?.delete('seiten-v1').catch(() => {});
 		await fetch('/api/logout', { method: 'POST' });
 		await goto(resolve('/login'), { replaceState: true, invalidateAll: true });
 	}
@@ -19,6 +32,11 @@
 	<section class="flex flex-1 flex-col items-center justify-center gap-2 text-center">
 		<p class="text-2xl">Hallo</p>
 		<p class="text-5xl font-bold break-words" data-testid="begruessung">{data.label}</p>
+		{#if offen > 0}
+			<p class="mt-4 text-slate-600" data-testid="noch-offen">
+				{offen} Antworten warten auf Internet.
+			</p>
+		{/if}
 	</section>
 	<div class="flex flex-col gap-3">
 		<a

@@ -70,6 +70,13 @@ export async function POST({ locals, request }) {
 	const item = skill.generator.generate(body.auftrag.params, body.auftrag.seed);
 	const bewertung = skill.generator.bewerte(item, antwort);
 	const dauer = Math.max(0, Math.min(3_600_000, Math.round(Number(body.duration_ms) || 0)));
+	// Offline gesammelte Antworten tragen die Zeit des Geräts; nur plausible Werte übernehmen
+	const jetzt = Date.now();
+	const zeit = Number(body.zeitpunkt);
+	const createdAt =
+		Number.isFinite(zeit) && zeit >= session.startedAt.getTime() - 5 * 60_000 && zeit <= jetzt
+			? new Date(zeit)
+			: new Date(jetzt);
 
 	await db
 		.insert(attempt)
@@ -85,7 +92,8 @@ export async function POST({ locals, request }) {
 			correct: bewertung.correct,
 			errorTag: bewertung.error_tag,
 			durationMs: dauer,
-			hintUsed: body.hint_used === true
+			hintUsed: body.hint_used === true,
+			createdAt
 		})
 		.onConflictDoNothing({ target: attempt.attemptUuid });
 

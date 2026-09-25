@@ -5,12 +5,13 @@
 	import Aufgabe from '$lib/aufgaben/Aufgabe.svelte';
 	import type { Modus } from '$lib/aufgaben/hilfe';
 	import { einstellungen, ladeEinstellungen } from '$lib/einstellungen.svelte';
-	import { Postausgang } from '$lib/postausgang';
+	import { postausgang } from '$lib/postausgang';
+	import { ladeSitzung, loescheSitzung, speichereSitzung } from '$lib/sitzung';
 	import { SKILLS } from '$lib/skills/katalog';
 	import type { Antwort, Item } from '$lib/skills/typen';
 	import { MAX_VERLAENGERUNGEN, type Auftrag, type SessionAntwort } from '$lib/training';
 
-	type Phase = 'laden' | 'aufgabe' | 'richtig' | 'ende' | 'leer' | 'fehler';
+	type Phase = 'laden' | 'aufgabe' | 'richtig' | 'ende' | 'leer' | 'fehler' | 'offline';
 
 	let sessionId = '';
 	let auftraege = $state<Auftrag[]>([]);
@@ -22,7 +23,6 @@
 	/** true richtig, false nicht gelöst, null nur angeschaut (Beispiel) */
 	let ergebnisse = $state<(boolean | null)[]>([]);
 	let startZeit = 0;
-	const postausgang = new Postausgang();
 
 	const item: Item | null = $derived.by(() => {
 		const a = auftraege[index];
@@ -36,14 +36,36 @@
 		return (await res.json()) as SessionAntwort;
 	}
 
+	/** Stand auf dem Gerät sichern, damit die Session nach einem Neuladen ohne Netz weitergeht */
+	function sichern() {
+		speichereSitzung({
+			sessionId,
+			auftraege: $state.snapshot(auftraege),
+			index,
+			ergebnisse: $state.snapshot(ergebnisse),
+			verlaengerungen
+		});
+	}
+
 	onMount(async () => {
 		ladeEinstellungen();
+		const gespeichert = ladeSitzung();
+		if (gespeichert) {
+			({ sessionId, auftraege, index, ergebnisse, verlaengerungen } = gespeichert);
+			starteAufgabe();
+			return;
+		}
+		// Erst Liegengebliebenes senden, sonst schließt der Server eine Session ohne ihre Antworten ab
+		await postausgang.leeren(3000);
 		try {
 			const s = await lade('/api/session/next');
 			sessionId = s.session_id;
 			auftraege = s.auftraege;
 			if (auftraege.length === 0) phase = 'leer';
-			else starteAufgabe();
+			else {
+				starteAufgabe();
+				sichern();
+			}
 		} catch {
 			phase = 'fehler';
 		}
@@ -73,7 +95,8 @@
 			auftrag,
 			answer: antwort,
 			duration_ms: Math.round(performance.now() - startZeit),
-			hint_used: versuch === 2
+			hint_used: versuch === 2,
+			zeitpunkt: Date.now()
 		});
 
 		if (bewertung.correct) {
@@ -96,6 +119,7 @@
 			index++;
 			starteAufgabe();
 		} else phase = 'ende';
+		sichern();
 	}
 
 	async function verlaengern() {
@@ -110,22 +134,19 @@
 			auftraege = [...auftraege, ...s.auftraege];
 			index++;
 			starteAufgabe();
+			sichern();
 		} catch {
 			phase = 'ende';
 		}
 	}
 
+	/** Abschluss über die Warteschlange: ohne Netz bleibt er auf dem Gerät und geht später raus */
 	async function beenden() {
 		phase = 'laden';
-		await postausgang.leeren();
-		if (sessionId) {
-			await fetch('/api/session/finish', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ session_id: sessionId })
-			}).catch(() => {});
-		}
-		await goto(resolve('/'));
+		loescheSitzung();
+		const angekommen = sessionId ? await postausgang.abschliessen(sessionId) : true;
+		if (angekommen) await goto(resolve('/'));
+		else phase = 'offline';
 	}
 </script>
 
@@ -167,6 +188,21 @@
 					type="button"
 					class="min-h-16 rounded-2xl bg-slate-800 px-8 text-xl text-white"
 					onclick={() => location.reload()}>Noch mal</button
+				>
+			</div>
+		{:else if phase === 'offline'}
+			<div class="flex h-full flex-col" data-testid="offline-gespeichert">
+				<section class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+					<p class="text-3xl font-bold">Gespeichert</p>
+					<p class="text-xl text-slate-600">
+						Deine Antworten werden gesendet, sobald das Handy wieder Internet hat.
+					</p>
+				</section>
+				<a
+					href={resolve('/')}
+					data-sveltekit-reload
+					class="flex min-h-20 items-center justify-center rounded-2xl bg-emerald-600 text-2xl font-semibold text-white shadow"
+					>Zur Startseite</a
 				>
 			</div>
 		{:else if phase === 'leer'}

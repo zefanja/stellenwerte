@@ -6,7 +6,7 @@ import postgres from 'postgres';
 import { pgOptions } from '../src/lib/server/db/connection.js';
 import { TEST_DATABASE_URL } from '../playwright.config';
 import { KATALOG } from '../src/lib/skills/katalog';
-import { DASHBOARD, LEHRKRAFT, SCHUELER, SCHUELER_WOCHE45 } from './testdaten';
+import { DASHBOARD, LEHRKRAFT, SCHUELER, SCHUELER_OFFLINE, SCHUELER_WOCHE45 } from './testdaten';
 
 /** Setzt die Test-Datenbank zurück und legt eine Lehrkraft mit einem Schüler mit bekanntem Code an. */
 export default async function seed() {
@@ -43,6 +43,14 @@ export default async function seed() {
 		await client`insert into card (student_id, skill_id, state, stability, difficulty, due, last_review, reps, introduced_at)
 			values (${s2.id}, ${skill}, 2, 5, 5, now() - ${4 - i} * interval '1 day', now() - interval '10 days', 3, now() - interval '30 days')`;
 	}
+
+	const index3 = createHmac('sha256', Buffer.from(secret, 'utf8'))
+		.update(`code:${SCHUELER_OFFLINE.code}`)
+		.digest()
+		.subarray(0, 3)
+		.toString('hex');
+	await client`insert into student (group_id, label, code_hash, code_index, code_last_rotated)
+		values (${g.id}, ${SCHUELER_OFFLINE.label}, ${await hash(SCHUELER_OFFLINE.code)}, ${index3}, now() - interval '1 minute')`;
 
 	await seedDashboard(client, t.id);
 	await client.end();
