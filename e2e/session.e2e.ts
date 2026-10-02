@@ -10,6 +10,7 @@ test.describe.configure({ mode: 'serial' });
 test('erste Session: Einführung einhändig lösbar, Verlängerung, danach FSRS-Karte', async ({
 	page
 }) => {
+	test.setTimeout(60_000);
 	await anmelden(page);
 	await page.goto('/');
 	const erste = await sessionAntwort(page, () =>
@@ -129,6 +130,8 @@ test('der Server bewertet selbst und nimmt keine veränderten Aufträge an', asy
 test('Wochen 4 bis 6: Stelle verändern, Rechenkette, Zahlenstrahl, Vergleichen, einhändig lösbar', async ({
 	page
 }) => {
+	// gut zwanzig Aufgaben, nach jedem Aufgabenwechsel die kurze Sperre gegen Durchtippen
+	test.setTimeout(60_000);
 	const res = await page.request.post('/api/login', {
 		data: { code: SCHUELER_WOCHE45.code, bestaetigt: true }
 	});

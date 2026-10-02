@@ -9,6 +9,8 @@ export const SCHUELER_WOCHE45 = {
 	code: '271828',
 	faellig: ['stelle_veraendern', 'rechenkette', 'zahlenstrahl', 'zahlen_vergleichen']
 };
+/** Kennt die ersten Skills; „Zahl mit Material legen“ ist als Wiederholung fällig */
+export const SCHUELER_LEGEN = { label: 'Testkind 04', code: '141421' };
 export const LEHRKRAFT = { email: 'e2e@schule.test', password: 'e2e-passwort-123' };
 
 /**

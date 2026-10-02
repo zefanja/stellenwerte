@@ -98,8 +98,9 @@
 				>
 				<button
 					type="button"
-					class="min-h-16 rounded-xl bg-emerald-600 text-xl font-semibold text-white shadow"
+					class="min-h-16 rounded-xl bg-emerald-600 text-xl font-semibold text-white shadow disabled:opacity-35"
 					aria-label="Fertig"
+					disabled={modell.wert() === 0}
 					onclick={() => onantwort({ typ: 'material', material: modell.material() })}
 					>✓ Fertig</button
 				>

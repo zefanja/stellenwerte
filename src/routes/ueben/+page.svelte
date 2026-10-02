@@ -30,6 +30,19 @@
 	let schritte = $state<Schrittfolge | undefined>();
 	/** Ankündigung vor einem Einführungsblock, damit „Schau zu“ nicht überraschend kommt */
 	let ankuendigung = $state<{ titel: string; text: string; neu: boolean } | null>(null);
+	/**
+	 * Kurze Sperre nach jedem Wechsel: Wer mehrfach auf „Fertig“ oder „Weiter“ tippt, trifft sonst
+	 * den Knopf, der an derselben Stelle neu erscheint, und gibt eine leere Antwort ab.
+	 */
+	const SPERRE_MS = 400;
+	let gesperrt = $state(false);
+	let sperrTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function sperreKurz() {
+		gesperrt = true;
+		clearTimeout(sperrTimer);
+		sperrTimer = setTimeout(() => (gesperrt = false), SPERRE_MS);
+	}
 
 	const item: Item | null = $derived.by(() => {
 		const a = auftraege[index];
@@ -104,11 +117,13 @@
 		modus = a.block === 'beispiel' ? 'loesung' : a.block === 'gefuehrt' ? 'hilfe' : 'versuch';
 		schritte = a.block === 'beispiel' ? new Schrittfolge() : undefined;
 		startZeit = performance.now();
+		sperreKurz();
 	}
 
 	function losGehts() {
 		phase = 'aufgabe';
 		startZeit = performance.now();
+		sperreKurz();
 	}
 
 	function nachAufgabe() {
@@ -117,7 +132,8 @@
 	}
 
 	function beantworte(antwort: Antwort) {
-		if (!item || modus === 'loesung') return;
+		// Nach einer richtigen Antwort bleibt die Aufgabe kurz stehen: weitere Tipps zählen nicht noch einmal
+		if (!item || modus === 'loesung' || phase !== 'aufgabe') return;
 		const auftrag = auftraege[index];
 		const bewertung = SKILLS.get(auftrag.skill_id)!.generator!.bewerte(item, antwort);
 		postausgang.senden({
@@ -139,6 +155,7 @@
 			versuch = 2;
 			modus = 'hilfe';
 			startZeit = performance.now();
+			sperreKurz();
 		} else {
 			ergebnisse[index] = false;
 			modus = 'loesung';
@@ -209,7 +226,7 @@
 		<span class="w-11"></span>
 	</header>
 
-	<div class="relative min-h-0 flex-1">
+	<div class="relative min-h-0 flex-1" inert={gesperrt || phase === 'richtig'}>
 		{#if phase === 'ankuendigung' && ankuendigung}
 			<div class="flex h-full flex-col" data-testid="ankuendigung">
 				<section class="flex flex-1 flex-col items-center justify-center gap-4 text-center">

@@ -74,6 +74,8 @@ export async function loese(page: Page, auftrag: Auftrag) {
 		const box = (await strahl.boundingBox())!;
 		expect(box.y).toBeGreaterThanOrEqual(page.viewportSize()!.height / 2);
 		const x = box.x + (box.width * (40 + ((zahl - von) / (bis - von)) * 920)) / 1000;
+		// roher Tipp ohne Prüfung: erst warten, bis die kurze Sperre nach dem Aufgabenwechsel vorbei ist
+		await strahl.tap({ trial: true });
 		await page.touchscreen.tap(x, box.y + box.height / 2);
 		await expect(page.getByTestId('marke')).toBeVisible();
 		await unten('Fertig');

@@ -6,7 +6,14 @@ import postgres from 'postgres';
 import { pgOptions } from '../src/lib/server/db/connection.js';
 import { TEST_DATABASE_URL } from '../playwright.config';
 import { KATALOG } from '../src/lib/skills/katalog';
-import { DASHBOARD, LEHRKRAFT, SCHUELER, SCHUELER_OFFLINE, SCHUELER_WOCHE45 } from './testdaten';
+import {
+	DASHBOARD,
+	LEHRKRAFT,
+	SCHUELER,
+	SCHUELER_LEGEN,
+	SCHUELER_OFFLINE,
+	SCHUELER_WOCHE45
+} from './testdaten';
 
 /** Setzt die Test-Datenbank zurück und legt eine Lehrkraft mit einem Schüler mit bekanntem Code an. */
 export default async function seed() {
@@ -51,6 +58,20 @@ export default async function seed() {
 		.toString('hex');
 	await client`insert into student (group_id, label, code_hash, code_index, code_last_rotated)
 		values (${g.id}, ${SCHUELER_OFFLINE.label}, ${await hash(SCHUELER_OFFLINE.code)}, ${index3}, now() - interval '1 minute')`;
+
+	const index4 = createHmac('sha256', Buffer.from(secret, 'utf8'))
+		.update(`code:${SCHUELER_LEGEN.code}`)
+		.digest()
+		.subarray(0, 3)
+		.toString('hex');
+	const [s4] =
+		await client`insert into student (group_id, label, code_hash, code_index, code_last_rotated)
+		values (${g.id}, ${SCHUELER_LEGEN.label}, ${await hash(SCHUELER_LEGEN.code)}, ${index4}, now() - interval '1 minute') returning id`;
+	for (const skill of ['buendeln_100', 'material_zu_zahl'])
+		await client`insert into card (student_id, skill_id, state, stability, difficulty, due, last_review, reps, introduced_at)
+			values (${s4.id}, ${skill}, 2, 40, 5, now() + interval '10 days', now() - interval '30 days', 5, now() - interval '60 days')`;
+	await client`insert into card (student_id, skill_id, state, stability, difficulty, due, last_review, reps, introduced_at)
+		values (${s4.id}, 'zahl_zu_material', 2, 5, 5, now() - interval '1 day', now() - interval '10 days', 3, now() - interval '30 days')`;
 
 	await seedDashboard(client, t.id);
 	await client.end();
