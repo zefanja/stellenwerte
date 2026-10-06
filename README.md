@@ -57,7 +57,7 @@ Einrichtung auf Uberspace, Updates, Backups und Datenschutz-Checkliste: [`docs/B
 - `src/lib/server/dashboard/daten.ts`: Abfragen fürs Dashboard; `src/lib/dashboard/regeln.ts`: Zellfarbe, Median, CSV (getestet)
 - `src/routes/api/teacher/gruppen/[id]/stand.csv` und `fehler.csv`: Exporte
 - `src/lib/server/codes/`: Codekarten-PDF (pdf-lib, QR mit `qrcode`) und Ablage der Klartext-Codes für den Druck
-- `src/lib/server/verwaltung.ts`: Codewechsel, Verschieben, Archivieren, Löschen, JSON-Auskunft
+- `src/lib/server/verwaltung.ts`: Codewechsel, Verschieben, Zurücksetzen, Archivieren, Löschen, JSON-Auskunft
 - `src/service-worker.ts`, `static/manifest.webmanifest`, `static/icons/` (erzeugt mit `scripts/icons.py`): PWA
 - `src/lib/postausgang.ts`: Warteschlange für Antworten im localStorage; `src/lib/sitzung.ts`: laufende Session auf dem Gerät
 - `deploy/`: supervisord-Dienste, `aktualisieren.sh`, `backup.sh` (pg_dump + gpg), Crontab
@@ -93,6 +93,7 @@ Einrichtung auf Uberspace, Updates, Backups und Datenschutz-Checkliste: [`docs/B
 - **Schülerprofil:** Skill-Liste zweispaltig, damit alle zwölf Skills bei 1366×660 ohne Scrollen passen.
 - **Klartext-Codes nur im Speicher:** Beim Anlegen oder Codewechsel stehen die Codes einmal auf dem Bildschirm und 15 Minuten lang unter einem Einmal-Link als PDF bereit, nur für die erzeugende Lehrkraft, nur im Speicher des Node-Prozesses (`cache-control: no-store`). Danach, oder nach einem Neustart, gibt es sie nicht mehr; ein neues PDF heißt neue Codes.
 - **Archivieren** entfernt Code und Kürzel (`label = 'archiviert'`). Die Lehrkraft wählt dabei: Lernstand anonym behalten (für Statistik; Antworten fallen nach 12 Monaten ohnehin weg) oder alles löschen. „Schuljahresende“ archiviert die ganze Gruppe.
+- **Lernstand zurücksetzen** löscht Karten, Sessions und alle Antworten eines Schülers; Kürzel, Code und Gruppe bleiben, das Kind beginnt wieder beim ersten Skill. Antworten einer gerade laufenden Session gehen dabei verloren (der Server kennt die Session nicht mehr, das Gerät verwirft sie).
 - **Löschen** entfernt den Schüler mit Karten, Sessions und allen Antworten (Fremdschlüssel mit `ON DELETE CASCADE`).
 - **Hinter dem Uberspace-Proxy `ADDRESS_HEADER=X-Forwarded-For` und `XFF_DEPTH=1` setzen**, sonst sehen alle Kinder für das Login-Rate-Limit wie eine IP aus, und zehn Fehlversuche irgendwo sperren alle.
 - **Woche 6 als Parametererweiterung:** Ist eine Gruppe bis Woche 6 freigegeben, kommt etwa jede zweite Aufgabe von Bündel zählen, Zahlenstrahl und Vergleichen mit Dezimalzahlen. Gerechnet wird intern in ganzen Einheiten der kleinsten Stelle; Dezimalaufgaben haben (noch) kein Material, nur die Stellenwerttafel mit Komma-Spalte.

@@ -188,6 +188,20 @@ test('Löschen: ein gelöschter Schüler hinterlässt keine Versuche, Karten ode
 	expect(await zaehle(id)).toEqual({ schueler: 0, versuche: 0, karten: 0, sessions: 0 });
 });
 
+test('Zurücksetzen: Lernstand weg, Schüler und Code bleiben', async ({ page }) => {
+	const label = LABELS[4];
+	const id = await idVon(label);
+	await uebeEtwas(page, codes.get(label)!);
+	expect((await zaehle(id)).versuche).toBeGreaterThan(0);
+
+	await oeffneVerwaltung(page);
+	await aktion(page, label, 'Lernstand zurücksetzen');
+	await expect(page.getByRole('status')).toContainText('zurückgesetzt');
+	expect(await zaehle(id)).toEqual({ schueler: 1, versuche: 0, karten: 0, sessions: 0 });
+	await expect(page.locator(`li[data-schueler="${label}"]`)).toHaveCount(1);
+	expect((await schuelerLogin(page, codes.get(label)!)).status()).toBe(200);
+});
+
 test('Archivieren: Code und Kürzel weg, Lernstand bleibt anonym erhalten', async ({ page }) => {
 	const label = LABELS[2];
 	const id = await idVon(label);

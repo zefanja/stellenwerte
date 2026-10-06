@@ -9,7 +9,8 @@ import {
 	loeschen,
 	neueCodes,
 	schuelerDerGruppe,
-	verschieben
+	verschieben,
+	zuruecksetzen
 } from '$lib/server/verwaltung';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -106,6 +107,13 @@ export const actions: Actions = {
 		return {
 			message: `${schueler.length} archiviert${behalten ? ', Lernstand anonymisiert behalten' : ', alle Daten gelöscht'}.`
 		};
+	},
+
+	reset: async ({ locals, params, request }) => {
+		const group = await requireOwnGroup(locals, params.id);
+		const s = await einSchuelerDerGruppe(group.id, (await request.formData()).get('student'));
+		await zuruecksetzen(s.id);
+		return { message: `Lernstand von ${s.label} wurde zurückgesetzt.` };
 	},
 
 	delete: async ({ locals, params, request }) => {

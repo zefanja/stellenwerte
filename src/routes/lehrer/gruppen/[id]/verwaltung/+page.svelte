@@ -109,6 +109,19 @@
 								</form>
 								<form
 									method="POST"
+									action="?/reset"
+									use:enhance={nachfragen(
+										`Lernstand von ${s.label} zurücksetzen? Alle Antworten und der Fortschritt werden gelöscht, Kürzel und Code bleiben.`
+									)}
+								>
+									<input type="hidden" name="student" value={s.id} />
+									<button
+										class="rounded border border-red-300 bg-white px-4 py-1 text-red-700 hover:bg-red-50"
+										>Lernstand zurücksetzen</button
+									>
+								</form>
+								<form
+									method="POST"
 									action="?/delete"
 									use:enhance={nachfragen(`${s.label} mit allen Daten endgültig löschen?`)}
 								>

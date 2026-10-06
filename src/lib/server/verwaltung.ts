@@ -70,6 +70,18 @@ export async function loeschen(studentIds: string[]) {
 	await db.delete(student).where(inArray(student.id, studentIds));
 }
 
+/**
+ * Lernstand zurücksetzen: Karten, Sessions und Versuche sind weg, das Kind beginnt wieder beim
+ * ersten Skill. Kürzel, Code und Gruppe bleiben, angemeldete Geräte bleiben angemeldet.
+ */
+export async function zuruecksetzen(studentId: string) {
+	await db.transaction(async (tx) => {
+		await tx.delete(attempt).where(eq(attempt.studentId, studentId));
+		await tx.delete(trainingSession).where(eq(trainingSession.studentId, studentId));
+		await tx.delete(card).where(eq(card.studentId, studentId));
+	});
+}
+
 /** Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten eines Schülers als JSON */
 export async function datenAuskunft(studentId: string) {
 	const [s] = await db
