@@ -6,10 +6,12 @@ import { BEWEGUNG_MS, LEUCHTEN_MS, gezeichnet, warte } from './animation';
 import {
 	layoutStreu,
 	layoutTafel,
+	streuMindesthoehe,
 	teilGroesse,
 	ZIFFERN_HOEHE,
 	type Lage,
 	type Rahmen,
+	type StreuBedarf,
 	type StreuLayout,
 	type TafelLayout
 } from './layout';
@@ -339,8 +341,21 @@ export class StreuModell {
 		return this.teile.reduce((s, t) => s + (t.art === 'Z' ? 10 : 1), 0);
 	}
 
+	/** Höchstens so viele Stangen entstehen, wenn alles gebündelt ist; Würfel wie zu Beginn. */
+	private get bedarf(): StreuBedarf {
+		return {
+			stangen: this.start.Z + Math.floor(this.start.E / 10),
+			wuerfel: this.start.E
+		};
+	}
+
+	/** Höhe, die das Feld bei dieser Breite mindestens braucht, damit kein Würfel fehlt */
+	mindestHoehe(breite: number): number {
+		return streuMindesthoehe(breite, this.bedarf);
+	}
+
 	setzeGroesse(breite: number, hoehe: number) {
-		this.layout = layoutStreu(breite, hoehe, this.seed);
+		this.layout = layoutStreu(breite, hoehe, this.seed, this.bedarf);
 		this.anordnen(true);
 	}
 

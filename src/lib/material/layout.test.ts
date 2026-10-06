@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KOPF_HOEHE, layoutStreu, layoutTafel, type Rahmen } from './layout';
+import { KOPF_HOEHE, layoutStreu, layoutTafel, streuMindesthoehe, type Rahmen } from './layout';
 import type { Stelle } from '$lib/skills/typen';
 
 const ueberlappen = (a: Rahmen, b: Rahmen) =>
@@ -69,6 +69,37 @@ describe('layoutStreu', () => {
 			expect(w.y + w.h).toBeLessThanOrEqual(330);
 			for (const s of l.stangenPlaetze) expect(ueberlappen(w, s)).toBe(false);
 		}
+	});
+
+	it('reserviert nur so viele Stangenreihen, wie die Aufgabe braucht', () => {
+		const wenig = layoutStreu(360, 330, 7, { stangen: 2, wuerfel: 23 });
+		const viel = layoutStreu(360, 330, 7, { stangen: 10, wuerfel: 23 });
+		expect(wenig.stangenPlaetze).toHaveLength(2);
+		expect(viel.stangenPlaetze).toHaveLength(10);
+		const oben = (l: typeof wenig) => Math.min(...l.wuerfelPlaetze.map((w) => w.y));
+		expect(oben(wenig)).toBeLessThan(oben(viel));
+	});
+
+	it.each([
+		[416, { stangen: 2, wuerfel: 23 }],
+		[416, { stangen: 9, wuerfel: 99 }],
+		[320, { stangen: 10, wuerfel: 45 }],
+		[288, { stangen: 0, wuerfel: 9 }]
+	])('bei Mindesthöhe hat jeder Würfel einen Platz im Feld: %i px, %o', (breite, bedarf) => {
+		const hoehe = streuMindesthoehe(breite, bedarf);
+		const l = layoutStreu(breite, hoehe, 5, bedarf);
+		expect(l.wuerfelPlaetze.length).toBeGreaterThanOrEqual(Math.max(30, bedarf.wuerfel));
+		expect(l.zelle).toBeGreaterThanOrEqual(28);
+		for (const w of l.wuerfelPlaetze) {
+			expect(w.y + w.h).toBeLessThanOrEqual(hoehe);
+			for (const s of l.stangenPlaetze) expect(ueberlappen(w, s)).toBe(false);
+		}
+	});
+
+	it('bleibt in einem zu niedrigen Feld ohne Plätze, statt negative Zeilen zu rechnen', () => {
+		const l = layoutStreu(416, 100, 1);
+		expect(l.wuerfelPlaetze).toHaveLength(0);
+		expect(l.zelle).toBe(28);
 	});
 
 	it('ist bei gleichem Seed gleich', () => {

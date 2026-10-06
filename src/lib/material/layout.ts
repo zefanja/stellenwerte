@@ -166,12 +166,12 @@ export function layoutTafel(
 
 // ---------------------------------------------------------------------------------------------
 // Ungeordnete Darstellung zum Bündeln: liegende Zehnerstangen oben in zwei Spalten, lose Würfel
-// darunter auf einem Raster mit Zellen von mindestens 44 px, damit jeder Würfel antippbar bleibt.
+// darunter auf einem Raster mit Zellen von mindestens 28 px, damit jeder Würfel antippbar bleibt.
 // ---------------------------------------------------------------------------------------------
 
 export interface StreuLayout {
 	u: number;
-	/** Plätze für bis zu zehn Stangen, der Reihe nach belegt */
+	/** Plätze für die Stangen, der Reihe nach belegt */
 	stangenPlaetze: Rahmen[];
 	/** Zellen für Würfel in der Reihenfolge ihrer Belegung (vom Seed gemischt) */
 	wuerfelPlaetze: Rahmen[];
@@ -179,29 +179,67 @@ export interface StreuLayout {
 	zelle: number;
 }
 
-export function layoutStreu(breite: number, hoehe: number, seed: number): StreuLayout {
+/** Was eine Aufgabe höchstens gleichzeitig zeigt; danach richtet sich der Platz. */
+export interface StreuBedarf {
+	stangen: number;
+	wuerfel: number;
+}
+
+const STANGEN_MAX = 10;
+const STANGEN_LUECKE = 8;
+const ZELLE_MAX = 48;
+const ZELLE_MIN = 28;
+const PLAETZE_MIN = 30; // Reserve, damit auch eine entbündelte Stange noch Platz findet
+const BEDARF_VOLL: StreuBedarf = { stangen: STANGEN_MAX, wuerfel: PLAETZE_MIN };
+
+const streuEinheit = (breite: number) => Math.min(16, (breite - 3 * RAND) / 20.5);
+
+/** Unterkante des Stangenbereichs: nur so viele Reihen, wie die Aufgabe braucht */
+function streuOben(u: number, stangen: number): number {
+	const reihen = Math.ceil(Math.min(stangen, STANGEN_MAX) / 2);
+	return reihen > 0 ? RAND + reihen * (u + STANGEN_LUECKE) + 4 : RAND;
+}
+
+/**
+ * Kleinste Feldhöhe, bei der alle Würfel der Aufgabe einen Platz bekommen. Ist das Fenster
+ * niedriger, muss das Feld diese Höhe behalten und die Seite scrollen.
+ */
+export function streuMindesthoehe(breite: number, bedarf: StreuBedarf = BEDARF_VOLL): number {
+	const spalten = Math.max(1, Math.floor((breite - 2 * RAND) / ZELLE_MIN));
+	const zeilen = Math.ceil(Math.max(PLAETZE_MIN, bedarf.wuerfel) / spalten);
+	return Math.ceil(streuOben(streuEinheit(breite), bedarf.stangen) + zeilen * ZELLE_MIN + RAND);
+}
+
+export function layoutStreu(
+	breite: number,
+	hoehe: number,
+	seed: number,
+	bedarf: StreuBedarf = BEDARF_VOLL
+): StreuLayout {
 	const rng = new Rng(seed);
-	const u = Math.min(16, (breite - 3 * RAND) / 20.5);
+	const u = streuEinheit(breite);
 	const stangenPlaetze: Rahmen[] = [];
 	const spaltenAbstand = breite - 2 * RAND - 20 * u;
-	for (let i = 0; i < 10; i++) {
+	const stangenReihen = Math.ceil(Math.min(bedarf.stangen, STANGEN_MAX) / 2);
+	for (let i = 0; i < 2 * stangenReihen; i++) {
 		stangenPlaetze.push({
 			x: RAND + (i % 2) * (10 * u + spaltenAbstand),
-			y: RAND + Math.floor(i / 2) * (u + 8),
+			y: RAND + Math.floor(i / 2) * (u + STANGEN_LUECKE),
 			b: 10 * u,
 			h: u
 		});
 	}
-	const obenBelegt = RAND + 5 * (u + 8) + 4;
+	const obenBelegt = streuOben(u, bedarf.stangen);
 
-	// größte Zelle zwischen 44 und 28 px, bei der mindestens 30 Würfel Platz haben
-	let zelle = 48;
-	let spalten = 0;
-	let zeilen = 0;
-	for (; zelle >= 28; zelle -= 2) {
-		spalten = Math.floor((breite - 2 * RAND) / zelle);
-		zeilen = Math.floor((hoehe - obenBelegt - RAND) / zelle);
-		if (spalten * zeilen >= 30) break;
+	// größte Zelle zwischen 48 und 28 px, bei der alle Würfel und die Reserve Platz haben
+	const noetig = Math.max(PLAETZE_MIN, bedarf.wuerfel);
+	let zelle = ZELLE_MAX;
+	let spalten: number;
+	let zeilen: number;
+	for (; ; zelle -= 2) {
+		spalten = Math.max(0, Math.floor((breite - 2 * RAND) / zelle));
+		zeilen = Math.max(0, Math.floor((hoehe - obenBelegt - RAND) / zelle));
+		if (spalten * zeilen >= noetig || zelle <= ZELLE_MIN) break;
 	}
 	const randX = (breite - spalten * zelle) / 2;
 	const wuerfelPlaetze: Rahmen[] = [];

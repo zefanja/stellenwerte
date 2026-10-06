@@ -14,7 +14,13 @@
 	});
 </script>
 
-<div class="feld" bind:clientWidth={breite} bind:clientHeight={hoehe}>
+<!-- Mindesthöhe: in niedrigen Fenstern scrollt die Seite, statt dass Würfel keinen Platz finden -->
+<div
+	class="feld"
+	bind:clientWidth={breite}
+	bind:clientHeight={hoehe}
+	style:min-height={breite > 0 ? `${modell.mindestHoehe(breite)}px` : null}
+>
 	{#each modell.teile as t (t.id)}
 		{#if t.art === 'E'}
 			<!-- Tippzelle um den Würfel, deutlich größer als der Würfel selbst -->

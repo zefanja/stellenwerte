@@ -51,9 +51,10 @@
 </script>
 
 <div class="aufgabe">
-	<section class="oben">
+	<!-- min-height auto: das Streufeld gibt seine Mindesthöhe nach oben weiter, die Seite scrollt dann -->
+	<section class="oben" style:min-height="auto">
 		<AufgabeKopf text={item.prompt} />
-		<div class="min-h-0 flex-1"><Streufeld {modell} /></div>
+		<div class="flex-1"><Streufeld {modell} /></div>
 		{#if modus === 'loesung' && fertig && item.loesung.typ === 'zahl'}
 			<p class="text-center text-4xl font-bold text-emerald-700" data-testid="loesung">
 				{item.loesung.wert}
