@@ -204,7 +204,9 @@
 
 <svelte:head><title>Üben</title></svelte:head>
 
-<main class="mx-auto flex h-dvh max-w-md flex-col px-4 pt-2 pb-4">
+<!-- fest am sichtbaren Bereich statt h-dvh: auf Android war dvh zeitweise höher als der Bildschirm,
+     dann rutschte der Ziffernblock unter den Rand und die Seite ließ sich scrollen -->
+<main class="fixed inset-0 mx-auto flex max-w-md flex-col px-4 pt-2 pb-4">
 	<header class="mb-2 flex items-center gap-2">
 		<button
 			type="button"
