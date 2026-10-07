@@ -50,6 +50,10 @@
 		return g ? g.generate(a.params, a.seed) : null;
 	});
 
+	const istBeispiel = $derived(
+		(phase === 'aufgabe' || phase === 'richtig') && !!item && auftraege[index]?.block === 'beispiel'
+	);
+
 	async function lade(url: string) {
 		const res = await fetch(url);
 		if (!res.ok) throw new Error(String(res.status));
@@ -223,7 +227,15 @@
 				></li>
 			{/each}
 		</ol>
-		<span class="w-11"></span>
+		<!-- im Kopf statt über der Aufgabe, damit das Etikett keine lange Frage verdeckt -->
+		<span class="flex min-w-11 justify-end">
+			{#if istBeispiel}
+				<span
+					class="rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold whitespace-nowrap text-sky-800"
+					data-testid="schau-zu">Schau zu</span
+				>
+			{/if}
+		</span>
 	</header>
 
 	<div class="relative min-h-0 flex-1" inert={gesperrt || phase === 'richtig'}>
@@ -323,14 +335,6 @@
 			</div>
 		{:else if item}
 			{#key `${index}:${versuch}`}
-				{#if auftraege[index].block === 'beispiel'}
-					<p
-						class="absolute -top-1 right-0 z-10 rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold text-sky-800"
-						data-testid="schau-zu"
-					>
-						Schau zu
-					</p>
-				{/if}
 				<Aufgabe {item} {modus} {schritte} onantwort={beantworte} onweiter={nachAufgabe} />
 			{/key}
 			{#if phase === 'richtig'}
