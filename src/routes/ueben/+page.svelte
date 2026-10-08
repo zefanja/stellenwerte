@@ -14,7 +14,15 @@
 	import { MAX_VERLAENGERUNGEN, type Auftrag, type SessionAntwort } from '$lib/training';
 
 	type Phase =
-		'laden' | 'ankuendigung' | 'aufgabe' | 'richtig' | 'ende' | 'leer' | 'fehler' | 'offline';
+		| 'laden'
+		| 'ankuendigung'
+		| 'aufgabe'
+		| 'richtig'
+		| 'falsch'
+		| 'ende'
+		| 'leer'
+		| 'fehler'
+		| 'offline';
 
 	let sessionId = '';
 	let auftraege = $state<Auftrag[]>([]);
@@ -51,7 +59,9 @@
 	});
 
 	const istBeispiel = $derived(
-		(phase === 'aufgabe' || phase === 'richtig') && !!item && auftraege[index]?.block === 'beispiel'
+		(phase === 'aufgabe' || phase === 'richtig' || phase === 'falsch') &&
+			!!item &&
+			auftraege[index]?.block === 'beispiel'
 	);
 
 	async function lade(url: string) {
@@ -154,8 +164,19 @@
 			ergebnisse[index] = true;
 			phase = 'richtig';
 			setTimeout(weiter, einstellungen.animationen ? 700 : 400);
-		} else if (versuch === 1) {
-			// keine Fehlermeldung: dieselbe Aufgabe noch einmal, jetzt mit Material zum Tauschen
+		} else {
+			// die eigene Antwort bleibt unter dem Signal kurz stehen, erst danach wechselt die Aufgabe
+			phase = 'falsch';
+			setTimeout(nachFalsch, einstellungen.animationen ? 900 : 600);
+		}
+	}
+
+	function nachFalsch() {
+		// inzwischen abgebrochen (✕): nichts mehr umschalten
+		if (phase !== 'falsch') return;
+		phase = 'aufgabe';
+		if (versuch === 1) {
+			// dieselbe Aufgabe noch einmal, jetzt mit Material zum Tauschen
 			versuch = 2;
 			modus = 'hilfe';
 			startZeit = performance.now();
@@ -240,7 +261,10 @@
 		</span>
 	</header>
 
-	<div class="relative min-h-0 flex-1" inert={gesperrt || phase === 'richtig'}>
+	<div
+		class="relative min-h-0 flex-1"
+		inert={gesperrt || phase === 'richtig' || phase === 'falsch'}
+	>
 		{#if phase === 'ankuendigung' && ankuendigung}
 			<div class="flex h-full flex-col" data-testid="ankuendigung">
 				<section class="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -342,7 +366,7 @@
 			{#if phase === 'richtig'}
 				<!-- kurzes visuelles Signal ohne Ton -->
 				<div
-					class="richtig pointer-events-none absolute inset-0 flex items-center justify-center"
+					class="signal pointer-events-none absolute inset-0 flex items-center justify-center"
 					data-testid="richtig"
 				>
 					<svg
@@ -356,13 +380,30 @@
 						<path d="m5 12 5 5L20 7" stroke-linecap="round" stroke-linejoin="round" />
 					</svg>
 				</div>
+			{:else if phase === 'falsch'}
+				<!-- gleiches Signal wie bei „richtig“, in Orange statt Rot: ein Hinweis, kein Tadel -->
+				<div
+					class="signal pointer-events-none absolute inset-0 flex items-center justify-center"
+					data-testid="falsch"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						class="h-40 w-40 rounded-full bg-amber-500/90 p-6 text-white"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="3"
+						aria-hidden="true"
+					>
+						<path d="m6 6 12 12M18 6 6 18" stroke-linecap="round" stroke-linejoin="round" />
+					</svg>
+				</div>
 			{/if}
 		{/if}
 	</div>
 </main>
 
 <style>
-	.richtig {
+	.signal {
 		animation: auf 250ms ease-out;
 	}
 	@keyframes auf {
@@ -372,7 +413,7 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.richtig {
+		.signal {
 			animation: none;
 		}
 	}

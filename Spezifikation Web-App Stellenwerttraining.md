@@ -134,7 +134,7 @@ Fünf Eingabekomponenten decken alle Skills ab. Jede ist einhändig im Hochforma
 - **Stellenwechsel:** Beim Übergang 399 + 1 wandern die vollen Stellen nacheinander um, sichtbar von rechts nach links.
 - **Material zu Zahl:** Die gelegten Bündel gleiten in die passende Spalte der Stellenwerttafel und werden dort zur Ziffer.
 
-**Rückmeldung:** Richtig gelöst ergibt ein kurzes visuelles Signal ohne Ton, falsch gelöst zeigt keine Fehlermeldung, sondern die Aufgabe noch einmal mit Material und der Möglichkeit, den Tausch selbst durchzuführen. Nach der zweiten falschen Antwort zeigt die App die Lösung als Animation und geht weiter. Kein Kind bleibt an einer Aufgabe hängen.
+**Rückmeldung:** Richtig gelöst ergibt ein kurzes visuelles Signal ohne Ton, falsch gelöst ergibt ebenfalls ein kurzes Signal (oranges Kreuz, kein Text) und danach die Aufgabe noch einmal mit Material und der Möglichkeit, den Tausch selbst durchzuführen. Nach der zweiten falschen Antwort zeigt die App die Lösung als Animation und geht weiter. Kein Kind bleibt an einer Aufgabe hängen.
 
 ## FSRS-Scheduling
 

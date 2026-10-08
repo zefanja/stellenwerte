@@ -83,11 +83,17 @@ test('zweimal falsch: Wiederholung mit Material, dann Lösung als Animation und 
 		await tippeUnten(page, page.getByRole('button', { name: '1', exact: true }));
 		await tippeUnten(page, page.getByRole('button', { name: 'Bestätigen' }));
 	};
+	const signal = async () => {
+		await expect(page.getByTestId('falsch')).toBeVisible();
+		await expect(page.getByTestId('falsch')).toBeHidden();
+	};
 	await falsch();
-	// keine Fehlermeldung, dieselbe Aufgabe noch einmal
+	// kurzes Signal ohne Text, dann dieselbe Aufgabe noch einmal
+	await signal();
 	await expect(page.getByTestId('prompt')).toBeVisible();
 	await expect(page.getByText(/falsch/i)).toHaveCount(0);
 	await falsch();
+	await signal();
 	await expect(page.getByTestId('loesung')).toBeVisible();
 	await tippeUnten(page, page.getByRole('button', { name: 'Weiter' }));
 	await expect(page.locator('ol[aria-label="Fortschritt"] li').nth(1)).toHaveClass(/bg-slate-800/);
